@@ -30,7 +30,7 @@ jobs:
         run: |
           ssh -T -i ~/.ssh/id_rsa ubuntu@${{ secrets.OCI_HOST }} << 'EOF'
             cd Focus_habit_BE
-            git pull origin main
+            git pull origin feature/continuous-deployment
             docker stop focus_app || true
             docker rm focus_app || true
             docker build -t focus_app .
