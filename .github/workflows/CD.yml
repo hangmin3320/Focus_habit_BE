@@ -31,10 +31,10 @@ jobs:
           ssh -T -i ~/.ssh/id_rsa ubuntu@${{ secrets.OCI_HOST }} << 'EOF'
             cd Focus_habit_BE
             git pull origin main
-            docker stop app || true
-            docker rm app || true
-            docker build -t app .
-            docker run -d --name app -p 8000:8000 app
+            docker stop Focus_app || true
+            docker rm Focus_app || true
+            docker build -t Focus_app .
+            docker run -d --name Focus_app -p 8000:8000 Focus_app
             docker image prune -f
           EOF
         shell: bash
