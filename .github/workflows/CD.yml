@@ -1,0 +1,40 @@
+name: Focus-habit BE continuous-deployment
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  CD:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.OCI_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.OCI_HOST }} >> ~/.ssh/known_hosts
+        shell: bash
+
+      - name: Test SSH Connection
+        run: ssh -T -i ~/.ssh/id_rsa ubuntu@${{ secrets.OCI_HOST }}
+
+      - name: Deploy Application
+        run: |
+          ssh -T -i ~/.ssh/id_rsa ubuntu@${{ secrets.OCI_HOST }} << 'EOF'
+            cd Focus_habit_BE
+            git pull origin main
+            docker stop focus_app || true
+            docker rm focus_app || true
+            docker build -t focus_app .
+            docker run -d --name focus_app -p 8000:8000 focus_app
+            docker image prune -f
+          EOF
+        shell: bash
