@@ -23,19 +23,8 @@ async def read_root():
 async def startup_event():
     print("Application startup...")
 
-    # 손 행동 분류 모델 로드
-    hand_action_model = None
-    model_path = "models/checkpoints/hand_action_model.joblib"
-    try:
-        hand_action_model = joblib.load(model_path)
-        print(f"Hand action model loaded from {model_path}")
-    except FileNotFoundError:
-        print(f"[WARN] Hand action model not found at {model_path}. Hand action analysis will be disabled.")
-    except Exception as e:
-        print(f"[ERROR] Failed to load hand action model from {model_path}: {e}")
-
     # AnalysisService 인스턴스를 생성하고 애플리케이션 상태에 저장
-    app.state.analysis_service = AnalysisService(hand_action_model=hand_action_model)
+    app.state.analysis_service = AnalysisService()
     print("AnalysisService initialized.")
 
 
