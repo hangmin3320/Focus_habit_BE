@@ -2,7 +2,7 @@ name: Focus-habit BE continuous-deployment
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "feature/continuous-deployment" ]
 
 permissions:
   contents: read
@@ -18,17 +18,17 @@ jobs:
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.OCI_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.GCP_SSHKEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.OCI_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
         shell: bash
 
       - name: Test SSH Connection
-        run: ssh -T -i ~/.ssh/id_rsa ubuntu@${{ secrets.OCI_HOST }}
+        run: ssh -T -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}
 
       - name: Deploy Application
         run: |
-          ssh -T -i ~/.ssh/id_rsa ubuntu@${{ secrets.OCI_HOST }} << 'EOF'
+          ssh -T -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
             cd Focus_habit_BE
             git pull origin main
             docker stop focus_app || true
