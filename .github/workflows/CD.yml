@@ -2,7 +2,7 @@ name: Focus-habit BE continuous-deployment
 
 on:
   push:
-    branches: [ "feature/continuous-deployment" ]
+    branches: [ "main" ]
 
 permissions:
   contents: read
