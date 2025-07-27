@@ -6,7 +6,6 @@ from mediapipe.tasks.python.vision import FaceLandmarkerResult, HandLandmarkerRe
 
 from services.modules.eye_analyzer import EyeAnalyzer
 from services.modules.head_pose_analyzer import HeadPoseAnalyzer
-from services.modules.hand_action_analyzer import HandActionAnalyzer
 
 
 class AnalysisService:
@@ -15,16 +14,13 @@ class AnalysisService:
     각 모듈을 호출하고, 결과를 취합하여 최종 분석 결과를 생성합니다.
     """
 
-    def __init__(self, hand_action_model: Any = None):
+    def __init__(self):
         """
         AnalysisService를 초기화하고 모든 분석 모듈을 로드합니다.
-        Args:
-            hand_action_model (Any): 미리 로드된 손 행동 분류 모델.
         """
         # 각 분석 모듈 인스턴스화
         self.eye_analyzer = EyeAnalyzer(ear_threshold=0.2)
         self.head_pose_analyzer = HeadPoseAnalyzer()
-        self.hand_action_analyzer = HandActionAnalyzer(model=hand_action_model)
 
         # MediaPipe Vision Task 초기화
         FaceLandmarker = mp.tasks.vision.FaceLandmarker
@@ -71,14 +67,12 @@ class AnalysisService:
         # 각 분석 모듈 실행
         eye_analysis_result = self.eye_analyzer.analyze_frame(face_landmarks)
         head_pose_result = self.head_pose_analyzer.analyze_frame(face_landmarks, image_shape)
-        hand_action_result = self.hand_action_analyzer.analyze_frame(hand_landmarks)
 
         # 결과 종합
         final_result = {
             "timestamp": timestamp_ms,
             "eye_status": eye_analysis_result,
-            "head_pose": head_pose_result,
-            "hand_action": hand_action_result,
+            "head_pose": head_pose_result
         }
 
         return final_result
@@ -104,7 +98,7 @@ if __name__ == '__main__':
 
     # AnalysisService 인스턴스화 (손 행동 분류 모델 없이 테스트)
     # 실제 실행 환경에서는 main.py에서 모델을 로드하여 주입합니다.
-    analysis_service = AnalysisService(hand_action_model=None)
+    analysis_service = AnalysisService()
 
     # AnalysisService 전체 파이프라인 테스트
     current_timestamp_ms = int(time.time() * 1000)
