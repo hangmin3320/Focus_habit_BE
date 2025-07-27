@@ -4,8 +4,8 @@ from pathlib import Path
 import mediapipe as mp
 from mediapipe.tasks.python.vision import FaceLandmarkerResult, HandLandmarkerResult
 
-from services.modules.eye_analyzer import EyeAnalyzer
-from services.modules.head_pose_analyzer import HeadPoseAnalyzer
+from app.services.modules.eye_analyzer import EyeAnalyzer
+from app.services.modules.head_pose_analyzer import HeadPoseAnalyzer
 
 
 class AnalysisService:
