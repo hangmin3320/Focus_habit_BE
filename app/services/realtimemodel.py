@@ -3,7 +3,6 @@ import torch.nn as nn
 warnings.filterwarnings('ignore')
 
 WIN=15; DROPOUT=0.3; K1=5; K2=5
-TAG=f"win{WIN}_do{str(DROPOUT).replace('.','')}_k{K1}-{K2}"
 CKPT_DIR="app/models/checkpoints"
 
 def _ensure_cols(df, cols):
@@ -103,8 +102,7 @@ class FocusEngine:
         self.buffer=pd.DataFrame(columns=['timestamp_ms','eye_status','prefix','label'])
         d0=pd.DataFrame([{'timestamp_ms':0,'eye_status':'OPEN','prefix':'D','label':0,'ear':0.0,'pitch':0.0,'yaw':0.0,'roll':0.0}])
         _,feats=feature_engineer(d0.copy()); self.features=feats
-
-        scaler_path=os.path.join(ckpt_dir,f"scaler_{TAG}.pkl")
+        scaler_path=os.path.join(ckpt_dir,"scaler.pkl")
         if os.path.exists(scaler_path):
             with open(scaler_path,'rb') as f:
                 self.std=pickle.load(f)
@@ -112,15 +110,11 @@ class FocusEngine:
         else:
             self.std=StreamStandardizer()
             self.use_stream_scaler=True
-
         self.model=TimeSeriesCNN(len(self.features),WIN,DROPOUT,K1,K2).to(self.device)
-        ckpts=[f"best_loss_cnn_{TAG}.pth",f"best_acc_cnn_{TAG}.pth",f"best_auc_cnn_{TAG}.pth",f"last_cnn_model_{TAG}.pth"]
-        path=None
-        for n in ckpts:
-            p=os.path.join(ckpt_dir,n)
-            if os.path.exists(p): path=p; break
-        if path is None: raise FileNotFoundError("checkpoint not found in "+ckpt_dir)
-        self.model.load_state_dict(torch.load(path,map_location=self.device))
+        model_path=os.path.join(ckpt_dir,"model.pth")
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(model_path+" not found")
+        self.model.load_state_dict(torch.load(model_path,map_location=self.device))
         self.model.eval()
         self.last_emitted_start=None
 
@@ -136,12 +130,13 @@ class FocusEngine:
             if c not in df.columns: df[c]=0.0
         X=df[self.features].values
         if self.use_stream_scaler:
-            if self.std.n==0 and len(X)>=WIN:
+            if getattr(self.std,"n",0)==0 and len(X)>=WIN:
                 self.std.partial_fit(X[:WIN])
             Xs=self.std.transform(X)
         else:
             Xs=self.std.transform(X)
         df[self.features]=Xs
+        df=df.sort_values(['prefix','timestamp_ms']).reset_index(drop=True)
         self.buffer=df
 
     def update_and_predict(self,incoming,prefix="STREAM",stride=None,overlap_ratio=None):
