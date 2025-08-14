@@ -48,3 +48,9 @@ class MediaPipeRunner:
             return detection_result.face_landmarks[0] # 첫 번째 얼굴의 랜드마크 반환
         else:
             return None # 얼굴 미감지 시 None 반환
+
+    def close(self):
+        """ MediaPipe FaceLandmarker 리소스를 해제합니다. """
+        if self.landmarker:
+            self.landmarker.close()
+            print("MediaPipe Face Landmarker resources released.")
