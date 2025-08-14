@@ -103,12 +103,17 @@ class AnalysisService:
 
     def add_new_frame(self, frame_data):
         """ 새로운 프레임 데이터를 버퍼에 추가하고, 버퍼가 차면 예측을 수행합니다. """
+        print(f"Before append - Buffer length: {len(self.frame_buffer)}")
         self.frame_buffer.append(frame_data)
+        print(f"After append - Buffer length: {len(self.frame_buffer)}")
 
         if len(self.frame_buffer) == SEQUENCE_LENGTH:
-            # 버퍼가 가득 차면, 시퀀스를 만들어 예측 실행
+            print("Buffer is full. Calling _predict.")
             sequence_to_predict = list(self.frame_buffer)
-            return self._predict(sequence_to_predict)
+            prediction_result = self._predict(sequence_to_predict)
+            print(f"add_new_frame returning prediction: {prediction_result is not None}")
+            return prediction_result
+        print("Buffer not full. add_new_frame returning None.")
         return None
 
     def _feature_engineer_sequence(self, sequence):
