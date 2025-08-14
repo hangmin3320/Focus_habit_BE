@@ -30,6 +30,7 @@ class AnalysisService:
 
         # 실시간 프레임 데이터를 저장할 버퍼 (고정 길이 큐)
         self.frame_buffer = collections.deque(maxlen=SEQUENCE_LENGTH)
+        print(f"AnalysisService __init__ - frame_buffer initialized with length: {len(self.frame_buffer)}") # NEW PRINT
         # 예측 결과 (타임스탬프, 예측값, 신뢰도)를 저장할 리스트
         self.prediction_history = []
 
