@@ -23,8 +23,8 @@ class AnalysisService:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
         self.model = self._load_model()
         
-        # Initialize MediaPipe and analysis modules
-        self.media_pipe_runner = MediaPipeRunner()
+        # Initialize MediaPipe and analysis modules lazily
+        self.media_pipe_runner = None # Initialize to None
         self.eye_analyzer = EyeAnalyzer()
         self.head_pose_analyzer = HeadPoseAnalyzer()
 
@@ -80,6 +80,9 @@ class AnalysisService:
         
         try:
             # Get face landmarks
+            if self.media_pipe_runner is None:
+                print("Initializing MediaPipeRunner lazily...")
+                self.media_pipe_runner = MediaPipeRunner()
             face_landmarks = self.media_pipe_runner.get_face_landmarks(frame_rgb)
         except Exception as e:
             print(f"Error getting face landmarks from MediaPipe: {e}")
