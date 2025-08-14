@@ -1,7 +1,7 @@
 import joblib
 from fastapi import FastAPI
 from api.websockets import router as websocket_router
-from services.analysis_service import AnalysisService
+from services.analysis_service import FocusAnalysisService
 
 app = FastAPI(
     title="AI Study Focus Analyzer Backend",
@@ -24,7 +24,7 @@ async def startup_event():
     print("Application startup...")
 
     # AnalysisService 인스턴스를 생성하고 애플리케이션 상태에 저장
-    app.state.analysis_service = AnalysisService()
+    app.state.analysis_service = FocusAnalysisService()
     print("AnalysisService initialized.")
 
 
