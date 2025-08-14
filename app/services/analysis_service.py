@@ -76,7 +76,7 @@ class AnalysisService:
             try:
                 # Analyze eye state and head pose
                 eye_status = self.eye_analyzer.analyze_frame(face_landmarks)
-                head_pose = self.head_pose_analyzer.analyze_frame(face_landmarks, frame.shape)
+                head_pose = self.head_pose_analyzer.analyze_frame(face_landmarks, frame.shape[:2]) # Pass only height and width
 
                 # Combine results into frame_data
                 frame_data["eye_status"] = eye_status
