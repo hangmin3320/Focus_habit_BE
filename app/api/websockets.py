@@ -62,5 +62,6 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         # In this architecture, analysis_service is a singleton managed by app.state,
         # so no need to call close() here. Resource cleanup should be handled by app.on_event("shutdown")
+        analysis_service.clear_buffer() # Clear buffer on WebSocket disconnect
         pass # Removed final analysis print as it's not session-specific anymore
 

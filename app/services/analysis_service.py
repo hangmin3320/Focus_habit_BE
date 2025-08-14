@@ -33,6 +33,12 @@ class AnalysisService:
         # 예측 결과 (타임스탬프, 예측값, 신뢰도)를 저장할 리스트
         self.prediction_history = []
 
+    def clear_buffer(self):
+        """ 버퍼와 예측 기록을 초기화합니다. """
+        self.frame_buffer.clear()
+        self.prediction_history.clear()
+        print("AnalysisService buffer and prediction history cleared.")
+
     def _load_model(self):
         """ 학습된 PyTorch 모델(.pth)을 로드합니다. """
         try:
