@@ -4,15 +4,9 @@ import numpy as np
 import time
 import json
 
-import base64
-import cv2
-import numpy as np
-import time
-import json
-
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request, Depends # Import Depends
-from services.analysis_service import AnalysisService # Import the renamed AnalysisService
-from dependencies.factories import get_analysis_service # Import the factory function
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request, Depends
+from services.analysis_service import AnalysisService
+from dependencies.factories import get_analysis_service
 
 router = APIRouter()
 

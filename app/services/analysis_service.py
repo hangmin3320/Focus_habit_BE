@@ -30,7 +30,7 @@ class AnalysisService:
 
         # 실시간 프레임 데이터를 저장할 버퍼 (고정 길이 큐)
         self.frame_buffer = collections.deque(maxlen=SEQUENCE_LENGTH)
-        print(f"AnalysisService __init__ - frame_buffer initialized with length: {len(self.frame_buffer)}") # NEW PRINT
+        
         # 예측 결과 (타임스탬프, 예측값, 신뢰도)를 저장할 리스트
         self.prediction_history = []
 
@@ -38,13 +38,13 @@ class AnalysisService:
         """ 버퍼와 예측 기록을 초기화합니다. """
         self.frame_buffer.clear()
         self.prediction_history.clear()
-        print("AnalysisService buffer and prediction history cleared.")
+        
 
     def close(self):
         """ MediaPipe 리소스를 해제합니다. """
         if self.media_pipe_runner:
             self.media_pipe_runner.close()
-            print("AnalysisService MediaPipe resources closed.")
+            
 
     def _load_model(self):
         """ 학습된 PyTorch 모델(.pth)을 로드합니다. """
@@ -81,7 +81,7 @@ class AnalysisService:
         try:
             # Get face landmarks
             if self.media_pipe_runner is None:
-                print("Initializing MediaPipeRunner lazily...")
+                
                 self.media_pipe_runner = MediaPipeRunner()
             face_landmarks = self.media_pipe_runner.get_face_landmarks(frame_rgb)
         except Exception as e:
@@ -119,17 +119,17 @@ class AnalysisService:
 
     def add_new_frame(self, frame_data):
         """ 새로운 프레임 데이터를 버퍼에 추가하고, 버퍼가 차면 예측을 수행합니다. """
-        print(f"Before append - Buffer length: {len(self.frame_buffer)}")
+        
         self.frame_buffer.append(frame_data)
-        print(f"After append - Buffer length: {len(self.frame_buffer)}")
+        
 
         if len(self.frame_buffer) == SEQUENCE_LENGTH:
-            print("Buffer is full. Calling _predict.")
+            
             sequence_to_predict = list(self.frame_buffer)
             prediction_result = self._predict(sequence_to_predict)
-            print(f"add_new_frame returning prediction: {prediction_result is not None}")
+            
             return prediction_result
-        print("Buffer not full. add_new_frame returning None.")
+        
         return None
 
     def _feature_engineer_sequence(self, sequence):
