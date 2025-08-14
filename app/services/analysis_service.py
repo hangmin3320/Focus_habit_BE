@@ -53,36 +53,52 @@ class AnalysisService:
         단일 프레임을 분석하여 눈 상태, 머리 자세 등을 추출하고,
         시계열 분석을 위해 버퍼에 추가합니다.
         """
-        # Convert frame to RGB for MediaPipe
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
-        # Get face landmarks
-        face_landmarks = self.media_pipe_runner.get_face_landmarks(frame_rgb)
-
         frame_data = {
             "timestamp": int(datetime.now().timestamp() * 1000),
             "eye_status": {}, # Default empty dict
             "head_pose": {}   # Default empty dict
         }
+        try:
+            # Convert frame to RGB for MediaPipe
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        except Exception as e:
+            print(f"Error converting frame to RGB: {e}")
+            return {"error": f"Frame conversion error: {e}"}
+        
+        try:
+            # Get face landmarks
+            face_landmarks = self.media_pipe_runner.get_face_landmarks(frame_rgb)
+        except Exception as e:
+            print(f"Error getting face landmarks from MediaPipe: {e}")
+            return {"error": f"MediaPipe error: {e}"}
 
         if face_landmarks:
-            # Analyze eye state and head pose
-            eye_status = self.eye_analyzer.analyze_frame(face_landmarks)
-            head_pose = self.head_pose_analyzer.analyze_frame(face_landmarks, frame.shape)
+            try:
+                # Analyze eye state and head pose
+                eye_status = self.eye_analyzer.analyze_frame(face_landmarks)
+                head_pose = self.head_pose_analyzer.analyze_frame(face_landmarks, frame.shape)
 
-            # Combine results into frame_data
-            frame_data["eye_status"] = eye_status
-            frame_data["head_pose"] = head_pose
+                # Combine results into frame_data
+                frame_data["eye_status"] = eye_status
+                frame_data["head_pose"] = head_pose
+            except Exception as e:
+                print(f"Error during eye/head pose analysis: {e}")
+                return {"error": f"Analysis module error: {e}"}
             
-            # Add to buffer and get prediction if buffer is full
-            prediction_result = self.add_new_frame(frame_data)
-            
-            # Return combined result, including prediction if available
-            if prediction_result:
-                frame_data["prediction_result"] = prediction_result
-            return frame_data
+            try:
+                # Add to buffer and get prediction if buffer is full
+                prediction_result = self.add_new_frame(frame_data)
+                
+                # Return combined result, including prediction if available
+                if prediction_result:
+                    frame_data["prediction_result"] = prediction_result
+                return frame_data
+            except Exception as e:
+                print(f"Error during adding frame to buffer or prediction: {e}")
+                return {"error": f"Prediction error: {e}"}
         else:
             # If no face detected, return frame_data with empty eye_status and head_pose
+            print("No face detected in frame.")
             return frame_data
 
     def add_new_frame(self, frame_data):
