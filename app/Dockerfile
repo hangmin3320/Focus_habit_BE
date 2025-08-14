@@ -10,11 +10,11 @@ WORKDIR /app
 COPY requirements.txt .
 
 # PyTorch CPU 버전 설치 (별도 인덱스 사용)
-    # typing-extensions 선행 설치 (PyTorch 종속성 문제 해결)
-    RUN pip install typing-extensions==4.12.2
-    
-    # PyTorch CPU 버전 설치 (별도 인덱스 사용)
-    RUN pip install --no-cache-dir torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+# typing-extensions 선행 설치 (PyTorch 종속성 문제 해결)
+RUN pip install typing-extensions==4.12.2
+
+# PyTorch CPU 버전 설치 (별도 인덱스 사용)
+RUN pip install --no-cache-dir torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 
 # 의존성 설치
 RUN pip install --no-cache-dir -r requirements.txt
