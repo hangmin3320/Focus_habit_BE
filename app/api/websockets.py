@@ -4,17 +4,15 @@ import numpy as np
 import time
 import json
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request # Import Request
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request, Depends # Import Depends
 from services.analysis_service import AnalysisService # Import the renamed AnalysisService
 
 router = APIRouter()
 
 @router.websocket("/ws/analysis")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, analysis_service: AnalysisService = Depends(AnalysisService)):
     await websocket.accept()
     print("WebSocket connection established.")
-
-    analysis_service: AnalysisService = AnalysisService() # Create a new instance for each connection
 
     try:
         while True:
