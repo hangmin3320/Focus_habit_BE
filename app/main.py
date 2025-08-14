@@ -22,21 +22,11 @@ async def read_root():
 @app.on_event("startup")
 async def startup_event():
     print("Application startup...")
-
-    # AnalysisService 인스턴스를 생성하고 애플리케이션 상태에 저장
-    app.state.analysis_service = AnalysisService() # Changed from FocusAnalysisService()
-    print("AnalysisService initialized.")
+    # AnalysisService is now instantiated per WebSocket connection, no global instance needed.
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     print("Application shutdown...")
-    # MediaPipe 리소스 해제 (필요시)
-    # The AnalysisService now handles its own MediaPipeRunner, which manages the landmarker resources.
-    # This specific cleanup might not be needed here if AnalysisService.close() handles it.
-    # For now, removing specific landmarker checks as AnalysisService is the orchestrator.
-    if hasattr(app.state.analysis_service, 'media_pipe_runner') and app.state.analysis_service.media_pipe_runner:
-        # Assuming MediaPipeRunner has a close method or handles its own cleanup
-        # If not, this line might need adjustment based on MediaPipeRunner's implementation
-        pass # Removed specific landmarker close calls, relying on AnalysisService's internal cleanup if any.
+    # Per-connection AnalysisService instances handle their own resource cleanup.
 

@@ -14,10 +14,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("WebSocket connection established.")
 
-    # Get the AnalysisService instance from app.state
-    # This assumes AnalysisService is initialized in main.py and stored in app.state
-    app = websocket.app # Access the FastAPI app instance
-    analysis_service: AnalysisService = app.state.analysis_service
+    analysis_service: AnalysisService = AnalysisService() # Create a new instance for each connection
 
     try:
         while True:
@@ -60,8 +57,6 @@ async def websocket_endpoint(websocket: WebSocket):
         print(f"General WebSocket error: {e}")
         await websocket.close(code=1011) # Explicitly close with 1011
     finally:
-        # In this architecture, analysis_service is a singleton managed by app.state,
-        # so no need to call close() here. Resource cleanup should be handled by app.on_event("shutdown")
         analysis_service.clear_buffer() # Clear buffer on WebSocket disconnect
-        pass # Removed final analysis print as it's not session-specific anymore
-
+        analysis_service.close() # Close MediaPipe resources for this connection
+        # Removed final analysis print as it's not session-specific anymore

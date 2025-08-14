@@ -2,7 +2,7 @@ name: Focus-habit BE continuous-deployment
 
 on:
   push:
-    branches: ["feature/focus-analyzer-TimeSeriesDL"]
+    branches: ["feature/multi-user-sessions"]
 
 permissions:
   contents: read

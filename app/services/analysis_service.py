@@ -39,6 +39,12 @@ class AnalysisService:
         self.prediction_history.clear()
         print("AnalysisService buffer and prediction history cleared.")
 
+    def close(self):
+        """ MediaPipe 리소스를 해제합니다. """
+        if self.media_pipe_runner:
+            self.media_pipe_runner.close()
+            print("AnalysisService MediaPipe resources closed.")
+
     def _load_model(self):
         """ 학습된 PyTorch 모델(.pth)을 로드합니다. """
         try:
