@@ -4,7 +4,6 @@ import collections
 import numpy as np
 from models.lstm_action_classifier import LSTMClassifier
 
-# --- 상수 및 설정 ---
 SEQUENCE_LENGTH = 30
 INPUT_DIM = 10
 HIDDEN_DIM = 64
@@ -53,19 +52,14 @@ class FocusAnalysisService:
         """ 시퀀스 데이터를 받아 모델로 예측하고, 결과를 저장 및 반환합니다. """
         if not self.model:
             return {"error": "Model is not loaded."}
-
-        # 1. Feature Engineering (TODO)
-        # 입력된 sequence(raw data)를 모델 입력에 맞는 텐서로 변환해야 합니다.
-        # 이 부분은 data_service.py의 로직과 동일하게 구현되어야 합니다.
+        
         feature_tensor = self._feature_engineer_sequence(sequence)
 
-        # 2. 모델 추론
         with torch.no_grad():
             output = self.model(feature_tensor)
             probabilities = torch.softmax(output, dim=1)
             confidence, predicted_class = torch.max(probabilities, 1)
 
-        # 3. 결과 저장 및 반환
         result = {
             "timestamp": sequence[-1]['timestamp'], # 마지막 프레임의 타임스탬프
             "prediction": 'focused' if predicted_class.item() == 1 else 'unfocused',
@@ -81,7 +75,6 @@ class FocusAnalysisService:
         """
         engineered_features = []
 
-        # 첫 프레임의 특징 벡터 (속도는 0으로 초기화)
         first_frame = sequence[0]
         ear = first_frame.get('eye_status', {}).get('ear_value', 0)
         pitch = first_frame.get('head_pose', {}).get('pitch', 0)
@@ -92,7 +85,6 @@ class FocusAnalysisService:
         first_feature_vector = [ear, pitch, yaw, roll, 0, 0, 0, 0, is_open, is_closed]
         engineered_features.append(first_feature_vector)
 
-        # 두 번째 프레임부터 속도 계산
         for i in range(1, len(sequence)):
             current_frame = sequence[i]
             prev_frame = sequence[i-1]
