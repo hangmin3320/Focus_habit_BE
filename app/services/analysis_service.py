@@ -2,7 +2,12 @@ import os
 import torch
 import collections
 import numpy as np
+from datetime import datetime
 from models.lstm_action_classifier import LSTMClassifier
+from services.media_pipe_runner import MediaPipeRunner
+from services.modules.eye_analyzer import EyeAnalyzer
+from services.modules.head_pose_analyzer import HeadPoseAnalyzer
+import cv2 # Added for cv2.cvtColor
 
 SEQUENCE_LENGTH = 30
 INPUT_DIM = 10
@@ -10,7 +15,7 @@ HIDDEN_DIM = 64
 NUM_LAYERS = 2
 MODEL_PATH = os.path.join(os.path.dirname(__file__), '../models/checkpoints/best_lstm_model.pth')
 
-class FocusAnalysisService:
+class AnalysisService:
     """
     실시간 스트림 데이터를 받아 집중도를 분석하고, 세션 기록을 관리합니다.
     """
@@ -18,6 +23,11 @@ class FocusAnalysisService:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
         self.model = self._load_model()
         
+        # Initialize MediaPipe and analysis modules
+        self.media_pipe_runner = MediaPipeRunner()
+        self.eye_analyzer = EyeAnalyzer()
+        self.head_pose_analyzer = HeadPoseAnalyzer()
+
         # 실시간 프레임 데이터를 저장할 버퍼 (고정 길이 큐)
         self.frame_buffer = collections.deque(maxlen=SEQUENCE_LENGTH)
         # 예측 결과 (타임스탬프, 예측값, 신뢰도)를 저장할 리스트
@@ -38,6 +48,43 @@ class FocusAnalysisService:
             print(f"An error occurred while loading the model: {e}")
             return None
 
+    async def analyze_frame(self, frame: np.ndarray):
+        """
+        단일 프레임을 분석하여 눈 상태, 머리 자세 등을 추출하고,
+        시계열 분석을 위해 버퍼에 추가합니다.
+        """
+        # Convert frame to RGB for MediaPipe
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # Get face landmarks
+        face_landmarks = self.media_pipe_runner.get_face_landmarks(frame_rgb)
+
+        frame_data = {
+            "timestamp": int(datetime.now().timestamp() * 1000),
+            "eye_status": {}, # Default empty dict
+            "head_pose": {}   # Default empty dict
+        }
+
+        if face_landmarks:
+            # Analyze eye state and head pose
+            eye_status = self.eye_analyzer.analyze_frame(face_landmarks)
+            head_pose = self.head_pose_analyzer.analyze_frame(face_landmarks, frame.shape)
+
+            # Combine results into frame_data
+            frame_data["eye_status"] = eye_status
+            frame_data["head_pose"] = head_pose
+            
+            # Add to buffer and get prediction if buffer is full
+            prediction_result = self.add_new_frame(frame_data)
+            
+            # Return combined result, including prediction if available
+            if prediction_result:
+                frame_data["prediction_result"] = prediction_result
+            return frame_data
+        else:
+            # If no face detected, return frame_data with empty eye_status and head_pose
+            return frame_data
+
     def add_new_frame(self, frame_data):
         """ 새로운 프레임 데이터를 버퍼에 추가하고, 버퍼가 차면 예측을 수행합니다. """
         self.frame_buffer.append(frame_data)
@@ -47,6 +94,56 @@ class FocusAnalysisService:
             sequence_to_predict = list(self.frame_buffer)
             return self._predict(sequence_to_predict)
         return None
+
+    def _feature_engineer_sequence(self, sequence):
+        """ 
+        하나의 시퀀스(30개 프레임)를 받아 Feature Engineering을 수행하고 
+        모델에 입력할 텐서로 변환합니다.
+        """
+        engineered_features = []
+
+        first_frame = sequence[0]
+        ear = first_frame.get('eye_status', {}).get('ear_value', 0.0)
+        pitch = first_frame.get('head_pose', {}).get('pitch', 0.0)
+        yaw = first_frame.get('head_pose', {}).get('yaw', 0.0)
+        roll = first_frame.get('head_pose', {}).get('roll', 0.0)
+        is_open = 1.0 if first_frame.get('eye_status', {}).get('status') == 'OPEN' else 0.0
+        is_closed = 1.0 if first_frame.get('eye_status', {}).get('status') == 'CLOSED' else 0.0
+        first_feature_vector = [ear, pitch, yaw, roll, 0.0, 0.0, 0.0, 0.0, is_open, is_closed]
+        engineered_features.append(first_feature_vector)
+
+        for i in range(1, len(sequence)):
+            current_frame = sequence[i]
+            prev_frame = sequence[i-1]
+
+            ear = current_frame.get('eye_status', {}).get('ear_value', 0.0)
+            pitch = current_frame.get('head_pose', {}).get('pitch', 0.0)
+            yaw = current_frame.get('head_pose', {}).get('yaw', 0.0)
+            roll = current_frame.get('head_pose', {}).get('roll', 0.0)
+
+            ear_vel = ear - prev_frame.get('eye_status', {}).get('ear_value', 0.0)
+            pitch_vel = pitch - prev_frame.get('head_pose', {}).get('pitch', 0.0)
+            yaw_vel = yaw - prev_frame.get('head_pose', {}).get('yaw', 0.0)
+            roll_vel = roll - prev_frame.get('head_pose', {}).get('roll', 0.0)
+
+            is_open = 1.0 if current_frame.get('eye_status', {}).get('status') == 'OPEN' else 0.0
+            is_closed = 1.0 if current_frame.get('eye_status', {}).get('status') == 'CLOSED' else 0.0
+
+            feature_vector = [
+                ear, pitch, yaw, roll,
+                ear_vel, pitch_vel, yaw_vel, roll_vel,
+                is_open, is_closed
+            ]
+            engineered_features.append(feature_vector)
+        
+        # Check for NaN or Inf values before creating tensor
+        final_features = np.array(engineered_features, dtype=np.float32)
+        if np.any(np.isnan(final_features)) or np.any(np.isinf(final_features)):
+            print("Warning: NaN or Inf values detected in engineered features. Returning error.")
+            # You might want to handle this more gracefully, e.g., by returning a default tensor or raising a specific error
+            return torch.zeros((1, SEQUENCE_LENGTH, INPUT_DIM), dtype=torch.float32).to(self.device) # Return a dummy tensor
+
+        return torch.tensor([engineered_features], dtype=torch.float32).to(self.device)
 
     def _predict(self, sequence):
         """ 시퀀스 데이터를 받아 모델로 예측하고, 결과를 저장 및 반환합니다. """

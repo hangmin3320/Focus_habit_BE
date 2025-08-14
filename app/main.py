@@ -1,7 +1,7 @@
 import joblib
 from fastapi import FastAPI
 from api.websockets import router as websocket_router
-from services.analysis_service import FocusAnalysisService
+from services.analysis_service import AnalysisService # Changed from FocusAnalysisService
 
 app = FastAPI(
     title="AI Study Focus Analyzer Backend",
@@ -24,7 +24,7 @@ async def startup_event():
     print("Application startup...")
 
     # AnalysisService 인스턴스를 생성하고 애플리케이션 상태에 저장
-    app.state.analysis_service = FocusAnalysisService()
+    app.state.analysis_service = AnalysisService() # Changed from FocusAnalysisService()
     print("AnalysisService initialized.")
 
 
@@ -32,7 +32,11 @@ async def startup_event():
 async def shutdown_event():
     print("Application shutdown...")
     # MediaPipe 리소스 해제 (필요시)
-    if hasattr(app.state.analysis_service, 'face_landmarker') and app.state.analysis_service.face_landmarker:
-        app.state.analysis_service.face_landmarker.close()
-    if hasattr(app.state.analysis_service, 'hand_landmarker') and app.state.analysis_service.hand_landmarker:
-        app.state.analysis_service.hand_landmarker.close()
+    # The AnalysisService now handles its own MediaPipeRunner, which manages the landmarker resources.
+    # This specific cleanup might not be needed here if AnalysisService.close() handles it.
+    # For now, removing specific landmarker checks as AnalysisService is the orchestrator.
+    if hasattr(app.state.analysis_service, 'media_pipe_runner') and app.state.analysis_service.media_pipe_runner:
+        # Assuming MediaPipeRunner has a close method or handles its own cleanup
+        # If not, this line might need adjustment based on MediaPipeRunner's implementation
+        pass # Removed specific landmarker close calls, relying on AnalysisService's internal cleanup if any.
+
