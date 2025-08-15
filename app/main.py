@@ -1,7 +1,7 @@
 import joblib
 from fastapi import FastAPI
 from api.websockets import router as websocket_router
-from services.analysis_service import AnalysisService
+from services.analysis_service import AnalysisService # Changed from FocusAnalysisService
 
 app = FastAPI(
     title="AI Study Focus Analyzer Backend",
@@ -22,17 +22,11 @@ async def read_root():
 @app.on_event("startup")
 async def startup_event():
     print("Application startup...")
-
-    # AnalysisService 인스턴스를 생성하고 애플리케이션 상태에 저장
-    app.state.analysis_service = AnalysisService()
-    print("AnalysisService initialized.")
+    # AnalysisService is now instantiated per WebSocket connection, no global instance needed.
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     print("Application shutdown...")
-    # MediaPipe 리소스 해제 (필요시)
-    if hasattr(app.state.analysis_service, 'face_landmarker') and app.state.analysis_service.face_landmarker:
-        app.state.analysis_service.face_landmarker.close()
-    if hasattr(app.state.analysis_service, 'hand_landmarker') and app.state.analysis_service.hand_landmarker:
-        app.state.analysis_service.hand_landmarker.close()
+    # Per-connection AnalysisService instances handle their own resource cleanup.
+
