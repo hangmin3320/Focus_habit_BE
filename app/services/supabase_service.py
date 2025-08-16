@@ -27,7 +27,7 @@ class SupabaseService:
             response = self.client.storage.from_(bucket_name).create_signed_upload_url(
                 path=file_path
             )
-            return response.get('signedURL')
+            return response.get('url')
         except Exception as e:
             print(f"Error generating presigned URL for {bucket_name}/{file_path}: {e}")
             raise
