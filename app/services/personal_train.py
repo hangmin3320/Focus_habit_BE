@@ -19,7 +19,7 @@ from models.realtimemodel_gru import TimeSeriesCNNGRU, feature_engineer # comput
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 
-CKPT_DIR = os.path.join(PROJECT_ROOT, "app", "models", "checkpoints")
+CKPT_DIR = os.path.join(PROJECT_ROOT, "models", "checkpoints")
 
 # (TimeSeriesCNNGRU, feature_engineer 등 모델/전처리 관련 함수들은 realtimemodel_gru.py에서 import하여 사용)
 # ... (이전 파일의 유틸리티 함수들은 그대로 유지되거나 realtimemodel_gru.py에서 가져옴)
