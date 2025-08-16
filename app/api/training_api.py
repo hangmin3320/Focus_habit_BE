@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Body, BackgroundTasks
 
 from services.supabase_service import supabase_service
 # Supabase 연동 학습 함수를 import 합니다.
-from ..services.personal_train import train_personal_from_storage
+from services.personal_train import train_personal_from_storage
 
 router = APIRouter()
 

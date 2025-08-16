@@ -8,8 +8,7 @@ import torch
 import torch.nn as nn
 import io
 
-# SupabaseService를 import합니다.
-from app.services.supabase_service import SupabaseService
+from services.supabase_service import SupabaseService
 
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(MODEL_DIR))
