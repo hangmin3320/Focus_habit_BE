@@ -24,4 +24,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # FastAPI 앱 코드를 컨테이너에 복사
 COPY . .
 
-CMD ["uvicorn", "main:app", "--port", "8000", "--host", "0.0.0.0", "--log-level", "debug"]
+CMD ["uvicorn", "app.main:app", "--port", "8000", "--host", "0.0.0.0", "--log-level", "debug"]
