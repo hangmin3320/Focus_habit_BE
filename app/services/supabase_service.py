@@ -32,7 +32,7 @@ class SupabaseService:
             return response.get('signedURL')
         except Exception as e:
             print(f"Error generating presigned URL for {bucket_name}/{file_path}: {e}")
-            return None
+            raise
 
     def download_file(self, bucket_name: str, file_path: str) -> bytes | None:
         """
