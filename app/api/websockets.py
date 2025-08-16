@@ -5,8 +5,8 @@ import time
 import json
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request, Depends
-from ..services.analysis_service import AnalysisService
-from ..dependencies.factories import get_analysis_service
+from services.analysis_service import AnalysisService
+from dependencies.factories import get_analysis_service
 
 router = APIRouter()
 
