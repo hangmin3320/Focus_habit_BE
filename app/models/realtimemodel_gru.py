@@ -6,31 +6,23 @@ import pickle
 import threading
 import torch
 import torch.nn as nn
+import io
+
+# SupabaseService를 import합니다.
+from app.services.supabase_service import SupabaseService
 
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(MODEL_DIR))
 
-CKPT_DIR = os.path.join(PROJECT_ROOT, "app", "models", "checkpoints")
+# 로컬 체크포인트 경로는 Fallback용으로 계속 사용합니다.
+LOCAL_CKPT_DIR = os.path.join(PROJECT_ROOT, "app", "models", "checkpoints")
 TEMPERATURE = 1.0
 
 
 class TimeSeriesCNNGRU(nn.Module):
     """
     1D-CNN + GRU 기반의 이진 분류 모델.
-
-    Args:
-        input_channels (int): 입력 채널 수(피처 개수).
-        window_size (int): 시퀀스 길이.
-        dropout_rate (float): 드롭아웃 확률.
-        k1 (int): 첫 번째 컨볼루션 커널 크기.
-        k2 (int): GRU hidden size.
-        two_convs (bool): 두 번째 컨볼루션 블록 사용 여부.
-
-    Input:
-        x (torch.Tensor): (B, T, C) 형태.
-
-    Output:
-        torch.Tensor: (B, 1) 로짓.
+    (이하 클래스 내용은 변경 없음)
     """
 
     def __init__(self, input_channels, window_size=25, dropout_rate=0.3, k1=3, k2=32, two_convs=True):
@@ -52,15 +44,6 @@ class TimeSeriesCNNGRU(nn.Module):
         self.fc = nn.Linear(k2, 1)
 
     def forward(self, x):
-        """
-        순전파.
-
-        Args:
-            x (torch.Tensor): (B, T, C)
-
-        Returns:
-            torch.Tensor: (B, 1) 로짓.
-        """
         x = x.permute(0, 2, 1)
         x = self.pool1(self.relu(self.bn1(self.conv1(x))))
         if self.two_convs:
@@ -71,40 +54,14 @@ class TimeSeriesCNNGRU(nn.Module):
         return self.fc(h)
 
 
+# feature_engineer, compute_stride, majority_smooth 함수 등은 변경 없음...
 def ensure_cols(df, cols):
-    """
-    지정 컬럼이 없으면 0.0 값으로 생성.
-
-    Args:
-        df (pd.DataFrame): 입력 데이터프레임.
-        cols (list[str]): 보장할 컬럼 목록.
-
-    Returns:
-        pd.DataFrame: 컬럼이 보장된 데이터프레임.
-    """
     for c in cols:
         if c not in df.columns: df[c] = 0.0
     return df
 
 
 def feature_engineer(df, base=('ear', 'pitch', 'yaw', 'roll'), username="USER"):
-    """
-    시계열 파생 피처 생성 및 정렬/결측 처리.
-
-    생성 피처:
-        - 각 base의 1차 차분(_diff)
-        - 이동평균5(_mean_5), 이동표준편차5(_std_5)
-        - blink_count(최근5 프레임)
-        - angle_magnitude(pitch/yaw/roll의 변화량 벡터 크기)
-
-    Args:
-        df (pd.DataFrame): 원본 DF.
-        base (tuple[str]): 기본 피처명.
-        username (str): prefix 기본값.
-
-    Returns:
-        Tuple[pd.DataFrame, list[str]]: (가공 DF, 피처 리스트)
-    """
     df = ensure_cols(df, list(base) + ['eye_status', 'prefix'])
     if 'timestamp_ms' not in df.columns: df['timestamp_ms'] = np.arange(len(df))
     if 'prefix' not in df.columns: df['prefix'] = username
@@ -128,30 +85,10 @@ def feature_engineer(df, base=('ear', 'pitch', 'yaw', 'roll'), username="USER"):
 
 
 def compute_stride(window_size, overlap=0.5):
-    """
-    겹침 비율에 따른 stride 계산.
-
-    Args:
-        window_size (int): 윈도우 길이.
-        overlap (float): 0~1, 예: 0.5면 50% 겹침.
-
-    Returns:
-        int: stride(최소 1).
-    """
     return max(1, int(window_size * (1 - overlap)))
 
 
 def majority_smooth(labels, k=3):
-    """
-    과반 스무딩(선형 스트림에서 최근 k개 평균 반올림).
-
-    Args:
-        labels (Iterable[int]): 0/1 시퀀스.
-        k (int): 윈도우 길이. k<=1이면 원본 반환.
-
-    Returns:
-        list[int]: 스무딩된 시퀀스.
-    """
     if k is None or k <= 1: return labels
     from collections import deque
     buf = deque(maxlen=k)
@@ -164,56 +101,36 @@ def majority_smooth(labels, k=3):
 
 class PersonalizedModelRunner:
     """
-    개인화 설정을 반영해 모델을 로드하고, 스트림 JSON을 누적/추론하는 런타임.
-
-    동작:
-        - JSON payload를 내부 버퍼에 누적
-        - 전처리/스케일링 후 슬라이딩 윈도우 단위로 추론
-        - 옵션에 따라 퍼센트/컨피던스로 구성된 JSON 레코드 반환
-
-    Args:
-        username (str): 사용자 ID. 개인화 자원 파일명 접두에 사용.
-        use_personal (bool): 개인화 모델/스케일러가 있으면 우선 사용.
-
-    Files:
-        {CKPT_DIR}/{username}_model.pth
-        {CKPT_DIR}/{username}_scaler.pkl
-        {CKPT_DIR}/{username}_header.json
-        기본값 미존재 시 {CKPT_DIR}/baseline_model.pth, scaler.pkl 사용
+    Supabase와 연동하여 개인화 모델을 로드하고, 실시간 추론을 수행하는 런타임.
     """
 
-    def __init__(self, username, use_personal=True):
-        self.username = username
+    def __init__(self, user_id: str, supabase_service: SupabaseService, use_personal: bool = True):
+        self.user_id = user_id
+        self.supabase_service = supabase_service
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.bucket_name = "models"  # Supabase 스토리지 버킷 이름
 
-        self.header_path = os.path.join(CKPT_DIR, f"{username}_header.json")
-        self.model_path = os.path.join(CKPT_DIR, f"{username}_model.pth") if use_personal and os.path.isfile(
-            os.path.join(CKPT_DIR, f"{username}_model.pth")) else os.path.join(CKPT_DIR, "baseline_model.pth")
-        self.scaler_path = os.path.join(CKPT_DIR, f"{username}_scaler.pkl") if use_personal and os.path.isfile(
-            os.path.join(CKPT_DIR, f"{username}_scaler.pkl")) else os.path.join(CKPT_DIR, "scaler.pkl")
-
+        self.scaler = None
+        self.model = None
+        
+        # 모델 설정값 (헤더) 및 피처 리스트 초기화
         self.window_size = 25
         self.overlap = 0.5
-        self.header_feats = None
+        self.features = None
         self.threshold = 0.5
         self.smooth_k = None
         self.temperature = TEMPERATURE
-        if os.path.isfile(self.header_path):
-            with open(self.header_path, 'r', encoding='utf-8') as f:
-                hdr = json.load(f)
-            self.window_size = int(hdr.get("window_size", 25))
-            self.overlap = float(hdr.get("overlap", 0.5))
-            self.header_feats = hdr.get("features", None)
-            self.threshold = float(hdr.get("threshold", 0.5))
-            self.smooth_k = hdr.get("smooth_k", None)
-            self.temperature = float(hdr.get("temperature", TEMPERATURE))
 
-        with open(self.scaler_path, 'rb') as f: self.scaler = pickle.load(f)
+        # 개인화 모델 로드를 시도하고, 실패 시 기본 모델을 로드합니다.
+        if use_personal:
+            self._try_load_personal_model()
 
-        self.features = None
-        self.model = None
+        # 개인화 모델 로드에 실패했거나, use_personal=False인 경우 기본 모델을 로드합니다.
+        if self.model is None or self.scaler is None:
+            print(f"User '{self.user_id}' - Loading baseline model.")
+            self._load_baseline_model()
+
         self.lock = threading.Lock()
-
         self.buffer = pd.DataFrame({
             'timestamp_ms': pd.Series(dtype='float64'),
             'eye_status': pd.Series(dtype='object'),
@@ -224,32 +141,61 @@ class PersonalizedModelRunner:
             'prefix': pd.Series(dtype='object'),
         })
 
-        self._load_model()
+    def _try_load_personal_model(self):
+        print(f"User '{self.user_id}' - Attempting to load personal model from Supabase.")
+        try:
+            header_bytes = self.supabase_service.download_file(self.bucket_name, f"{self.user_id}/{self.user_id}_header.json")
+            scaler_bytes = self.supabase_service.download_file(self.bucket_name, f"{self.user_id}/{self.user_id}_scaler.pkl")
+            model_bytes = self.supabase_service.download_file(self.bucket_name, f"{self.user_id}/{self.user_id}_model.pth")
 
-    def _load_model(self):
-        """
-        피처 목록 확정 후 모델 구조 생성 및 가중치 로드, eval 모드 전환.
-        """
-        if self.header_feats is None:
-            tmp = pd.DataFrame(
-                [{"timestamp_ms": 0, "eye_status": "OPEN", "ear": 0.0, "pitch": 0.0, "yaw": 0.0, "roll": 0.0,
-                  "prefix": self.username}])
-            tmp, feats = feature_engineer(tmp, username=self.username)
-            self.features = feats
-        else:
-            self.features = self.header_feats
+            if not all([header_bytes, scaler_bytes, model_bytes]):
+                print(f"User '{self.user_id}' - Personal model files not found in Supabase.")
+                return
+
+            # 헤더 파일 로드 및 설정 적용
+            hdr = json.loads(header_bytes.decode('utf-8'))
+            self.window_size = int(hdr.get("window_size", 25))
+            self.overlap = float(hdr.get("overlap", 0.5))
+            self.features = hdr.get("features", None)
+            self.threshold = float(hdr.get("threshold", 0.5))
+            self.smooth_k = hdr.get("smooth_k", None)
+            self.temperature = float(hdr.get("temperature", TEMPERATURE))
+
+            # 스케일러 로드
+            self.scaler = pickle.loads(scaler_bytes)
+
+            # 모델 구조 생성 및 가중치 로드
+            self.model = TimeSeriesCNNGRU(len(self.features), self.window_size, 0.3, 3, 32, True).to(self.device)
+            self.model.load_state_dict(torch.load(io.BytesIO(model_bytes), map_location=self.device))
+            self.model.eval()
+            print(f"User '{self.user_id}' - Personal model loaded successfully from Supabase.")
+
+        except Exception as e:
+            print(f"An error occurred while loading personal model for user '{self.user_id}': {e}")
+            # 실패 시 self.model, self.scaler를 None으로 유지하여 기본 모델을 로드하도록 함
+            self.model = None
+            self.scaler = None
+
+    def _load_baseline_model(self):
+        # 헤더는 없으므로, 피처 엔지니어링을 통해 피처 목록을 동적으로 생성
+        tmp = pd.DataFrame(
+            [{"timestamp_ms": 0, "eye_status": "OPEN", "ear": 0.0, "pitch": 0.0, "yaw": 0.0, "roll": 0.0,
+              "prefix": self.user_id}])
+        tmp, self.features = feature_engineer(tmp, username=self.user_id)
+
+        # 로컬 기본 스케일러 로드
+        scaler_path = os.path.join(LOCAL_CKPT_DIR, "scaler.pkl")
+        with open(scaler_path, 'rb') as f:
+            self.scaler = pickle.load(f)
+
+        # 로컬 기본 모델 로드
+        model_path = os.path.join(LOCAL_CKPT_DIR, "baseline_model.pth")
         self.model = TimeSeriesCNNGRU(len(self.features), self.window_size, 0.3, 3, 32, True).to(self.device)
-        sd = torch.load(self.model_path, map_location=self.device)
-        self.model.load_state_dict(sd)
+        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.eval()
 
     def _append_json(self, payload):
-        """
-        입력 JSON payload를 표준 스키마로 변환해 내부 버퍼에 누적.
-
-        Args:
-            payload (str|bytes|list|dict): 파일 경로, JSON 문자열, 또는 객체.
-        """
+        # (이하 메소드 내용은 변경 없음)
         if isinstance(payload, str) and os.path.isfile(payload):
             with open(payload, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -270,7 +216,7 @@ class PersonalizedModelRunner:
                 'pitch': float(hp.get('pitch', 0.0)),
                 'yaw': float(hp.get('yaw', 0.0)),
                 'roll': float(hp.get('roll', 0.0)),
-                'prefix': self.username
+                'prefix': self.user_id
             })
         df = pd.DataFrame(rows)
         if 'timestamp_ms' not in df.columns:
@@ -281,42 +227,15 @@ class PersonalizedModelRunner:
             self.buffer = pd.concat([self.buffer, df], ignore_index=True)
 
     def push_and_infer(self, json_payload, threshold=None, return_prob=False, smooth_k=None, return_json=False):
-        """
-        JSON payload를 누적하고 슬라이딩 윈도우 단위로 추론.
-
-        스케일링/윈도우 처리 후 각 윈도우 마지막 타임스탬프 기준으로 결과 1건 생성.
-        return_json=True이면 아래 스키마로 반환:
-            {
-              "timestamp": <int>,
-              "eye_status": {"status": <str>, "ear_value": <float>},
-              "head_pose": {"pitch": <float>, "yaw": <float>, "roll": <float>},
-              "prediction_result": {
-                "timestamp": <int>,
-                "prediction": <float:0~100>,  # 집중도 퍼센트
-                "confidence": <float:0~1>     # max(p, 1-p)
-              }
-            }
-
-        Args:
-            json_payload (str|bytes|list|dict): 입력 JSON.
-            threshold (float|None): 이진 예측 임계값. None이면 헤더의 threshold.
-            return_prob (bool): True면 (preds, probs) 반환.
-            smooth_k (int|None): 다수결 스무딩 길이. None이면 헤더의 smooth_k.
-            return_json (bool): True면 JSON 레코드 리스트 반환.
-
-        Returns:
-            list|tuple: return_json=True → list[dict],
-                        return_prob=True → (preds, probs),
-                        그 외 → preds
-        """
+        # (이하 메소드 내용은 변경 없음)
         with self.lock:
             self._append_json(json_payload)
             df = self.buffer.copy()
-            df, feats = feature_engineer(df, username=self.username)
-            if self.header_feats is not None:
-                for c in self.header_feats:
+            df, feats = feature_engineer(df, username=self.user_id)
+            if self.features is not None:
+                for c in self.features:
                     if c not in df.columns: df[c] = 0.0
-                feats = self.header_feats
+                feats = self.features
             df[feats] = self.scaler.transform(df[feats])
 
             stride = compute_stride(self.window_size, self.overlap)
@@ -367,8 +286,3 @@ class PersonalizedModelRunner:
             if return_json:
                 return records
             return (preds, probs) if return_prob else preds
-
-
-if __name__ == "__main__":
-    username = "username"
-    runner = PersonalizedModelRunner(username, use_personal=True)

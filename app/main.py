@@ -1,7 +1,7 @@
-import joblib
 from fastapi import FastAPI
-from api.websockets import router as websocket_router
-from services.analysis_service import AnalysisService # Changed from FocusAnalysisService
+from app.api.websockets import router as websocket_router
+from app.api.training_api import router as training_router # training_api 라우터 import
+from app.services.analysis_service import AnalysisService # Changed from FocusAnalysisService
 
 app = FastAPI(
     title="AI Study Focus Analyzer Backend",
@@ -11,6 +11,8 @@ app = FastAPI(
 
 # 웹소켓 라우터 포함
 app.include_router(websocket_router)
+# 학습 API 라우터 포함
+app.include_router(training_router, prefix="/api/v1", tags=["Training"])
 
 
 @app.get("/", tags=["Health Check"])
