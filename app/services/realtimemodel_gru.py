@@ -1,7 +1,15 @@
-import os, json, pickle, numpy as np, pandas as pd, torch, torch.nn as nn, threading
+import json
+import numpy as np
+import os
+import pandas as pd
+import pickle
+import threading
+import torch
+import torch.nn as nn
 
 CKPT_DIR = "app/models/checkpoint"
 TEMPERATURE = 1.0
+
 
 class TimeSeriesCNNGRU(nn.Module):
     """
@@ -21,23 +29,26 @@ class TimeSeriesCNNGRU(nn.Module):
     Output:
         torch.Tensor: (B, 1) 로짓.
     """
+
     def __init__(self, input_channels, window_size=25, dropout_rate=0.3, k1=3, k2=32, two_convs=True):
         super().__init__()
-        c=32; ks=k1; pad=ks//2
-        self.two_convs=two_convs
-        self.conv1=nn.Conv1d(input_channels,c,kernel_size=ks,padding=pad,bias=False)
-        self.bn1=nn.BatchNorm1d(c)
-        self.relu=nn.ReLU()
-        self.pool1=nn.MaxPool1d(2)
+        c = 32
+        ks = k1
+        pad = ks // 2
+        self.two_convs = two_convs
+        self.conv1 = nn.Conv1d(input_channels, c, kernel_size=ks, padding=pad, bias=False)
+        self.bn1 = nn.BatchNorm1d(c)
+        self.relu = nn.ReLU()
+        self.pool1 = nn.MaxPool1d(2)
         if self.two_convs:
-            self.conv2=nn.Conv1d(c,c,kernel_size=ks,padding=pad,bias=False)
-            self.bn2=nn.BatchNorm1d(c)
-            self.pool2=nn.MaxPool1d(2)
-        self.gru=nn.GRU(input_size=c,hidden_size=k2,num_layers=1,batch_first=True,bidirectional=False)
-        self.dropout=nn.Dropout(dropout_rate)
-        self.fc=nn.Linear(k2,1)
+            self.conv2 = nn.Conv1d(c, c, kernel_size=ks, padding=pad, bias=False)
+            self.bn2 = nn.BatchNorm1d(c)
+            self.pool2 = nn.MaxPool1d(2)
+        self.gru = nn.GRU(input_size=c, hidden_size=k2, num_layers=1, batch_first=True, bidirectional=False)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc = nn.Linear(k2, 1)
 
-    def forward(self,x):
+    def forward(self, x):
         """
         순전파.
 
@@ -47,13 +58,13 @@ class TimeSeriesCNNGRU(nn.Module):
         Returns:
             torch.Tensor: (B, 1) 로짓.
         """
-        x=x.permute(0,2,1)
-        x=self.pool1(self.relu(self.bn1(self.conv1(x))))
+        x = x.permute(0, 2, 1)
+        x = self.pool1(self.relu(self.bn1(self.conv1(x))))
         if self.two_convs:
-            x=self.pool2(self.relu(self.bn2(self.conv2(x))))
-        x=x.permute(0,2,1)
-        _,h=self.gru(x)
-        h=self.dropout(h[-1])
+            x = self.pool2(self.relu(self.bn2(self.conv2(x))))
+        x = x.permute(0, 2, 1)
+        _, h = self.gru(x)
+        h = self.dropout(h[-1])
         return self.fc(h)
 
 
@@ -69,11 +80,11 @@ def ensure_cols(df, cols):
         pd.DataFrame: 컬럼이 보장된 데이터프레임.
     """
     for c in cols:
-        if c not in df.columns: df[c]=0.0
+        if c not in df.columns: df[c] = 0.0
     return df
 
 
-def feature_engineer(df, base=('ear','pitch','yaw','roll'), username="USER"):
+def feature_engineer(df, base=('ear', 'pitch', 'yaw', 'roll'), username="USER"):
     """
     시계열 파생 피처 생성 및 정렬/결측 처리.
 
@@ -91,25 +102,26 @@ def feature_engineer(df, base=('ear','pitch','yaw','roll'), username="USER"):
     Returns:
         Tuple[pd.DataFrame, list[str]]: (가공 DF, 피처 리스트)
     """
-    df=ensure_cols(df,list(base)+['eye_status','prefix'])
-    if 'timestamp_ms' not in df.columns: df['timestamp_ms']=np.arange(len(df))
-    if 'prefix' not in df.columns: df['prefix']=username
-    df=df.sort_values(['prefix','timestamp_ms'])
+    df = ensure_cols(df, list(base) + ['eye_status', 'prefix'])
+    if 'timestamp_ms' not in df.columns: df['timestamp_ms'] = np.arange(len(df))
+    if 'prefix' not in df.columns: df['prefix'] = username
+    df = df.sort_values(['prefix', 'timestamp_ms'])
     for f in base:
-        if f not in df.columns: df[f]=0.0
+        if f not in df.columns: df[f] = 0.0
     for f in base:
-        df[f'{f}_diff']=df.groupby('prefix')[f].diff().fillna(0)
-        m=df.groupby('prefix')[f].rolling(window=5,min_periods=1).mean().reset_index(level=0,drop=True)
-        s=df.groupby('prefix')[f].rolling(window=5,min_periods=1).std().fillna(0).reset_index(level=0,drop=True)
-        df[f'{f}_mean_5']=m
-        df[f'{f}_std_5']=s
-    df['eye_status_numeric']=df['eye_status'].map({'OPEN':1,'CLOSED':0}).fillna(0)
-    t=df.groupby('prefix')['eye_status_numeric'].diff().eq(-1)
-    df['blink_count']=t.rolling(window=5,min_periods=1).sum().fillna(0).reset_index(level=0,drop=True)
-    df['angle_magnitude']=np.sqrt(df['pitch_diff']**2+df['yaw_diff']**2+df['roll_diff']**2)
-    feats=list(base)+[f'{f}_diff' for f in base]+[f'{f}_mean_5' for f in base]+[f'{f}_std_5' for f in base]+['blink_count','angle_magnitude']
-    df[feats]=df[feats].replace([np.inf,-np.inf],0).fillna(0)
-    return df,feats
+        df[f'{f}_diff'] = df.groupby('prefix')[f].diff().fillna(0)
+        m = df.groupby('prefix')[f].rolling(window=5, min_periods=1).mean().reset_index(level=0, drop=True)
+        s = df.groupby('prefix')[f].rolling(window=5, min_periods=1).std().fillna(0).reset_index(level=0, drop=True)
+        df[f'{f}_mean_5'] = m
+        df[f'{f}_std_5'] = s
+    df['eye_status_numeric'] = df['eye_status'].map({'OPEN': 1, 'CLOSED': 0}).fillna(0)
+    t = df.groupby('prefix')['eye_status_numeric'].diff().eq(-1)
+    df['blink_count'] = t.rolling(window=5, min_periods=1).sum().fillna(0).reset_index(level=0, drop=True)
+    df['angle_magnitude'] = np.sqrt(df['pitch_diff'] ** 2 + df['yaw_diff'] ** 2 + df['roll_diff'] ** 2)
+    feats = list(base) + [f'{f}_diff' for f in base] + [f'{f}_mean_5' for f in base] + [f'{f}_std_5' for f in base] + [
+        'blink_count', 'angle_magnitude']
+    df[feats] = df[feats].replace([np.inf, -np.inf], 0).fillna(0)
+    return df, feats
 
 
 def compute_stride(window_size, overlap=0.5):
@@ -123,7 +135,7 @@ def compute_stride(window_size, overlap=0.5):
     Returns:
         int: stride(최소 1).
     """
-    return max(1,int(window_size*(1-overlap)))
+    return max(1, int(window_size * (1 - overlap)))
 
 
 def majority_smooth(labels, k=3):
@@ -137,9 +149,10 @@ def majority_smooth(labels, k=3):
     Returns:
         list[int]: 스무딩된 시퀀스.
     """
-    if k is None or k<=1: return labels
+    if k is None or k <= 1: return labels
     from collections import deque
-    buf=deque(maxlen=k); out=[]
+    buf = deque(maxlen=k)
+    out = []
     for v in labels:
         buf.append(v)
         out.append(int(round(np.mean(buf))))
@@ -163,46 +176,49 @@ class PersonalizedModelRunner:
         {CKPT_DIR}/{username}_model.pth
         {CKPT_DIR}/{username}_scaler.pkl
         {CKPT_DIR}/{username}_header.json
-        기본값 미존재 시 {CKPT_DIR}/model.pth, scaler.pkl 사용
+        기본값 미존재 시 {CKPT_DIR}/baseline_model.pth, scaler.pkl 사용
     """
+
     def __init__(self, username, use_personal=True):
-        self.username=username
-        self.device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.username = username
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self.header_path=os.path.join(CKPT_DIR,f"{username}_header.json")
-        self.model_path=os.path.join(CKPT_DIR,f"{username}_model.pth") if use_personal and os.path.isfile(os.path.join(CKPT_DIR,f"{username}_model.pth")) else os.path.join(CKPT_DIR,"model.pth")
-        self.scaler_path=os.path.join(CKPT_DIR,f"{username}_scaler.pkl") if use_personal and os.path.isfile(os.path.join(CKPT_DIR,f"{username}_scaler.pkl")) else os.path.join(CKPT_DIR,"scaler.pkl")
+        self.header_path = os.path.join(CKPT_DIR, f"{username}_header.json")
+        self.model_path = os.path.join(CKPT_DIR, f"{username}_model.pth") if use_personal and os.path.isfile(
+            os.path.join(CKPT_DIR, f"{username}_model.pth")) else os.path.join(CKPT_DIR, "baseline_model.pth")
+        self.scaler_path = os.path.join(CKPT_DIR, f"{username}_scaler.pkl") if use_personal and os.path.isfile(
+            os.path.join(CKPT_DIR, f"{username}_scaler.pkl")) else os.path.join(CKPT_DIR, "scaler.pkl")
 
-        self.window_size=25
-        self.overlap=0.5
-        self.header_feats=None
-        self.threshold=0.5
-        self.smooth_k=None
-        self.temperature=TEMPERATURE
+        self.window_size = 25
+        self.overlap = 0.5
+        self.header_feats = None
+        self.threshold = 0.5
+        self.smooth_k = None
+        self.temperature = TEMPERATURE
         if os.path.isfile(self.header_path):
-            with open(self.header_path,'r',encoding='utf-8') as f:
-                hdr=json.load(f)
-            self.window_size=int(hdr.get("window_size",25))
-            self.overlap=float(hdr.get("overlap",0.5))
-            self.header_feats=hdr.get("features",None)
-            self.threshold=float(hdr.get("threshold",0.5))
-            self.smooth_k=hdr.get("smooth_k",None)
-            self.temperature=float(hdr.get("temperature",TEMPERATURE))
+            with open(self.header_path, 'r', encoding='utf-8') as f:
+                hdr = json.load(f)
+            self.window_size = int(hdr.get("window_size", 25))
+            self.overlap = float(hdr.get("overlap", 0.5))
+            self.header_feats = hdr.get("features", None)
+            self.threshold = float(hdr.get("threshold", 0.5))
+            self.smooth_k = hdr.get("smooth_k", None)
+            self.temperature = float(hdr.get("temperature", TEMPERATURE))
 
-        with open(self.scaler_path,'rb') as f: self.scaler=pickle.load(f)
+        with open(self.scaler_path, 'rb') as f: self.scaler = pickle.load(f)
 
-        self.features=None
-        self.model=None
-        self.lock=threading.Lock()
+        self.features = None
+        self.model = None
+        self.lock = threading.Lock()
 
         self.buffer = pd.DataFrame({
             'timestamp_ms': pd.Series(dtype='float64'),
-            'eye_status':   pd.Series(dtype='object'),
-            'ear':          pd.Series(dtype='float64'),
-            'pitch':        pd.Series(dtype='float64'),
-            'yaw':          pd.Series(dtype='float64'),
-            'roll':         pd.Series(dtype='float64'),
-            'prefix':       pd.Series(dtype='object'),
+            'eye_status': pd.Series(dtype='object'),
+            'ear': pd.Series(dtype='float64'),
+            'pitch': pd.Series(dtype='float64'),
+            'yaw': pd.Series(dtype='float64'),
+            'roll': pd.Series(dtype='float64'),
+            'prefix': pd.Series(dtype='object'),
         })
 
         self._load_model()
@@ -212,13 +228,15 @@ class PersonalizedModelRunner:
         피처 목록 확정 후 모델 구조 생성 및 가중치 로드, eval 모드 전환.
         """
         if self.header_feats is None:
-            tmp=pd.DataFrame([{"timestamp_ms":0,"eye_status":"OPEN","ear":0.0,"pitch":0.0,"yaw":0.0,"roll":0.0,"prefix":self.username}])
-            tmp,feats=feature_engineer(tmp,username=self.username)
-            self.features=feats
+            tmp = pd.DataFrame(
+                [{"timestamp_ms": 0, "eye_status": "OPEN", "ear": 0.0, "pitch": 0.0, "yaw": 0.0, "roll": 0.0,
+                  "prefix": self.username}])
+            tmp, feats = feature_engineer(tmp, username=self.username)
+            self.features = feats
         else:
-            self.features=self.header_feats
-        self.model=TimeSeriesCNNGRU(len(self.features),self.window_size,0.3,3,32,True).to(self.device)
-        sd=torch.load(self.model_path,map_location=self.device)
+            self.features = self.header_feats
+        self.model = TimeSeriesCNNGRU(len(self.features), self.window_size, 0.3, 3, 32, True).to(self.device)
+        sd = torch.load(self.model_path, map_location=self.device)
         self.model.load_state_dict(sd)
         self.model.eval()
 
@@ -229,30 +247,31 @@ class PersonalizedModelRunner:
         Args:
             payload (str|bytes|list|dict): 파일 경로, JSON 문자열, 또는 객체.
         """
-        if isinstance(payload,str) and os.path.isfile(payload):
-            with open(payload,'r',encoding='utf-8') as f: data=json.load(f)
-        elif isinstance(payload,(str,bytes)):
-            data=json.loads(payload)
+        if isinstance(payload, str) and os.path.isfile(payload):
+            with open(payload, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        elif isinstance(payload, (str, bytes)):
+            data = json.loads(payload)
         else:
-            data=payload
-        rows=[]
+            data = payload
+        rows = []
         for it in data:
-            ts=it.get('timestamp',it.get('timestamp_ms',None))
-            es=it.get('eye_status',{})
-            hp=it.get('head_pose',{})
-            ear_val=es.get('ear_value',es.get('ear',0.0))
+            ts = it.get('timestamp', it.get('timestamp_ms', None))
+            es = it.get('eye_status', {})
+            hp = it.get('head_pose', {})
+            ear_val = es.get('ear_value', es.get('ear', 0.0))
             rows.append({
                 'timestamp_ms': ts if ts is not None else np.nan,
-                'eye_status': es.get('status','OPEN'),
+                'eye_status': es.get('status', 'OPEN'),
                 'ear': float(ear_val) if ear_val is not None else 0.0,
-                'pitch': float(hp.get('pitch',0.0)),
-                'yaw': float(hp.get('yaw',0.0)),
-                'roll': float(hp.get('roll',0.0)),
+                'pitch': float(hp.get('pitch', 0.0)),
+                'yaw': float(hp.get('yaw', 0.0)),
+                'roll': float(hp.get('roll', 0.0)),
                 'prefix': self.username
             })
-        df=pd.DataFrame(rows)
+        df = pd.DataFrame(rows)
         if 'timestamp_ms' not in df.columns:
-            df['timestamp_ms']=np.arange(len(df))
+            df['timestamp_ms'] = np.arange(len(df))
         if self.buffer.empty:
             self.buffer = df.copy()
         else:
@@ -289,55 +308,57 @@ class PersonalizedModelRunner:
         """
         with self.lock:
             self._append_json(json_payload)
-            df=self.buffer.copy()
-            df,feats=feature_engineer(df,username=self.username)
+            df = self.buffer.copy()
+            df, feats = feature_engineer(df, username=self.username)
             if self.header_feats is not None:
                 for c in self.header_feats:
-                    if c not in df.columns: df[c]=0.0
-                feats=self.header_feats
-            df[feats]=self.scaler.transform(df[feats])
+                    if c not in df.columns: df[c] = 0.0
+                feats = self.header_feats
+            df[feats] = self.scaler.transform(df[feats])
 
-            stride=compute_stride(self.window_size,self.overlap)
-            preds=[]; probs=[]; records=[]
+            stride = compute_stride(self.window_size, self.overlap)
+            preds = []
+            probs = []
+            records = []
 
             thr = threshold if threshold is not None else self.threshold
             use_smooth_k = smooth_k if smooth_k is not None else self.smooth_k
 
             for p in df['prefix'].unique():
-                g=df[df['prefix']==p].sort_values('timestamp_ms')
-                if len(g)<self.window_size: continue
-                arr=g[feats].values
-                for i in range(0,len(g)-self.window_size+1,stride):
-                    x=arr[i:i+self.window_size][None,...]
-                    x=torch.tensor(x,dtype=torch.float32).to(self.device)
+                g = df[df['prefix'] == p].sort_values('timestamp_ms')
+                if len(g) < self.window_size: continue
+                arr = g[feats].values
+                for i in range(0, len(g) - self.window_size + 1, stride):
+                    x = arr[i:i + self.window_size][None, ...]
+                    x = torch.tensor(x, dtype=torch.float32).to(self.device)
                     with torch.no_grad():
-                        logit=self.model(x).squeeze(-1)
-                        pr=torch.sigmoid(logit/self.temperature).item()
+                        logit = self.model(x).squeeze(-1)
+                        pr = torch.sigmoid(logit / self.temperature).item()
                     probs.append(pr)
-                    pred=1 if pr>=thr else 0
+                    pred = 1 if pr >= thr else 0
                     preds.append(pred)
 
                     if return_json:
-                        ts=int(g['timestamp_ms'].iloc[i+self.window_size-1])
-                        eye=str(g['eye_status'].iloc[i+self.window_size-1])
-                        ear=float(g['ear'].iloc[i+self.window_size-1])
-                        pitch=float(g['pitch'].iloc[i+self.window_size-1])
-                        yaw=float(g['yaw'].iloc[i+self.window_size-1])
-                        roll=float(g['roll'].iloc[i+self.window_size-1])
-                        conf=float(max(pr,1.0-pr))
-                        rec={
+                        ts = int(g['timestamp_ms'].iloc[i + self.window_size - 1])
+                        eye = str(g['eye_status'].iloc[i + self.window_size - 1])
+                        ear = float(g['ear'].iloc[i + self.window_size - 1])
+                        pitch = float(g['pitch'].iloc[i + self.window_size - 1])
+                        yaw = float(g['yaw'].iloc[i + self.window_size - 1])
+                        roll = float(g['roll'].iloc[i + self.window_size - 1])
+                        conf = float(max(pr, 1.0 - pr))
+                        rec = {
                             "timestamp": ts,
                             "eye_status": {"status": eye, "ear_value": ear},
                             "head_pose": {"pitch": pitch, "yaw": yaw, "roll": roll},
                             "prediction_result": {
                                 "timestamp": ts,
-                                "prediction": float(np.clip(pr*100.0,0.0,100.0)),
+                                "prediction": float(np.clip(pr * 100.0, 0.0, 100.0)),
                                 "confidence": conf
                             }
                         }
                         records.append(rec)
 
-            if use_smooth_k and len(preds)>0:
+            if use_smooth_k and len(preds) > 0:
                 preds = majority_smooth(preds, k=int(use_smooth_k))
 
             if return_json:
@@ -345,6 +366,6 @@ class PersonalizedModelRunner:
             return (preds, probs) if return_prob else preds
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     username = "username"
     runner = PersonalizedModelRunner(username, use_personal=True)
