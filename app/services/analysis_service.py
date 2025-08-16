@@ -7,7 +7,7 @@ from services.media_pipe_runner import MediaPipeRunner
 from services.modules.eye_analyzer import EyeAnalyzer
 from services.modules.head_pose_analyzer import HeadPoseAnalyzer
 from models.realtimemodel_gru import PersonalizedModelRunner
-from supabase_service import supabase_service
+from services.supabase_service import supabase_service
 
 class AnalysisService:
     """
