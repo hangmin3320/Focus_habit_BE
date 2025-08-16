@@ -4,9 +4,9 @@ FROM python:3.10-bullseye
 RUN apt-get update && apt-get install -y libgl1-mesa-glx
 
 # 작업 디렉토리 설정
-WORKDIR /app
+WORKDIR /usr/src/app
 
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=.
 
 # 의존성 파일들을 컨테이너에 복사
 COPY requirements.txt .
