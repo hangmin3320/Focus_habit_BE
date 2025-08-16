@@ -26,8 +26,7 @@ class SupabaseService:
         try:
             response = self.client.storage.from_(bucket_name).create_signed_url(
                 path=file_path,
-                expires_in=expires_in,
-                options={'upsert': 'true'} # 덮어쓰기 허용 옵션
+                expires_in=expires_in
             )
             return response.get('signedURL')
         except Exception as e:
