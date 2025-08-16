@@ -178,9 +178,15 @@ class PersonalizedModelRunner:
 
     def _load_baseline_model(self):
         # 헤더는 없으므로, 피처 엔지니어링을 통해 피처 목록을 동적으로 생성
-        tmp = pd.DataFrame(
-            [{"timestamp_ms": 0, "eye_status": "OPEN", "ear": 0.0, "pitch": 0.0, "yaw": 0.0, "roll": 0.0,
-              "prefix": self.user_id}])
+        tmp = pd.DataFrame({
+            "timestamp_ms": [0],
+            "eye_status": ["OPEN"],
+            "ear": [0.0],
+            "pitch": [0.0],
+            "yaw": [0.0],
+            "roll": [0.0],
+            "prefix": [self.user_id]
+        })
         tmp, self.features = feature_engineer(tmp, username=self.user_id)
 
         # 로컬 기본 스케일러 로드
