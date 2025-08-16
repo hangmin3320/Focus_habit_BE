@@ -7,7 +7,10 @@ import threading
 import torch
 import torch.nn as nn
 
-CKPT_DIR = "app/models/checkpoint"
+MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(MODEL_DIR))
+
+CKPT_DIR = os.path.join(PROJECT_ROOT, "app", "models", "checkpoints")
 TEMPERATURE = 1.0
 
 

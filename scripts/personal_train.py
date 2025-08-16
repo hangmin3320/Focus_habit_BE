@@ -10,7 +10,10 @@ import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-CKPT_DIR = "app/models/checkpoint"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+
+CKPT_DIR = os.path.join(PROJECT_ROOT, "app", "models", "checkpoints")
 
 
 class TimeSeriesCNNGRU(nn.Module):
@@ -454,7 +457,7 @@ def train_personal(username, json_focus_path, json_nonfocus_path,
 
 if __name__ == "__main__":
     username = "username"
-    data_dir = "app/data"
+    data_dir = os.path.join(PROJECT_ROOT, "app", "data")
 
     # 파일명 규칙: app/data/{username}_focus.json, app/data/{username}_nonfocus.json
     focus_json = os.path.join(data_dir, f"{username}_focus.json")
