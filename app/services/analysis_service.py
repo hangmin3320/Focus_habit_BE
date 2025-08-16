@@ -3,11 +3,11 @@ from datetime import datetime
 import cv2
 
 # 내부 로직이 변경됨에 따라 필요한 클래스들을 새로 import 합니다.
-from app.services.media_pipe_runner import MediaPipeRunner
-from app.services.modules.eye_analyzer import EyeAnalyzer
-from app.services.modules.head_pose_analyzer import HeadPoseAnalyzer
-from ..models.realtimemodel_gru import PersonalizedModelRunner
-from .supabase_service import supabase_service
+from services.media_pipe_runner import MediaPipeRunner
+from services.modules.eye_analyzer import EyeAnalyzer
+from services.modules.head_pose_analyzer import HeadPoseAnalyzer
+from models.realtimemodel_gru import PersonalizedModelRunner
+from supabase_service import supabase_service
 
 class AnalysisService:
     """

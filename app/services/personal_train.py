@@ -12,8 +12,8 @@ import io
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from app.services.supabase_service import supabase_service
-from app.models.realtimemodel_gru import TimeSeriesCNNGRU, feature_engineer # compute_sequences 제거
+from services.supabase_service import supabase_service
+from models.realtimemodel_gru import TimeSeriesCNNGRU, feature_engineer # compute_sequences 제거
 
 # 스크립트의 위치를 기준으로 프로젝트 루트 디렉토리를 찾습니다。
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

@@ -1,4 +1,4 @@
-from ..services.analysis_service import AnalysisService
+from services.analysis_service import AnalysisService
 from fastapi import Depends, WebSocket
 
 

@@ -4,9 +4,7 @@ FROM python:3.10-bullseye
 RUN apt-get update && apt-get install -y libgl1-mesa-glx
 
 # 작업 디렉토리 설정
-WORKDIR /usr/src/app
-
-ENV PYTHONPATH=.
+WORKDIR /app
 
 # 의존성 파일들을 컨테이너에 복사
 COPY requirements.txt .
@@ -24,4 +22,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # FastAPI 앱 코드를 컨테이너에 복사
 COPY . .
 
-CMD ["uvicorn", "app.main:app", "--port", "8000", "--host", "0.0.0.0", "--log-level", "debug"]
+CMD ["uvicorn", "main:app", "--port", "8000", "--host", "0.0.0.0", "--log-level", "debug"]

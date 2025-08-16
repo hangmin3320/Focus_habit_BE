@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from app.api.websockets import router as websocket_router
-from app.api.training_api import router as training_router # training_api 라우터 import
-from app.services.analysis_service import AnalysisService # Changed from FocusAnalysisService
+from api.websockets import router as websocket_router
+from api.training_api import router as training_router # training_api 라우터 import
+from services.analysis_service import AnalysisService # Changed from FocusAnalysisService
 
 app = FastAPI(
     title="AI Study Focus Analyzer Backend",
