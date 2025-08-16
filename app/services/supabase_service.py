@@ -25,8 +25,7 @@ class SupabaseService:
         """
         try:
             response = self.client.storage.from_(bucket_name).create_signed_upload_url(
-                path=file_path,
-                expires_in=expires_in
+                path=file_path
             )
             return response.get('signedURL')
         except Exception as e:
