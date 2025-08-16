@@ -24,7 +24,7 @@ class SupabaseService:
         지정된 경로에 파일을 업로드할 수 있는 Presigned URL을 생성합니다.
         """
         try:
-            response = self.client.storage.from_(bucket_name).create_signed_url(
+            response = self.client.storage.from_(bucket_name).create_signed_upload_url(
                 path=file_path,
                 expires_in=expires_in
             )
