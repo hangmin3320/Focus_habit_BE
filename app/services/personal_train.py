@@ -246,7 +246,10 @@ def train_personal_from_storage(user_id: str, storage_path: str):
             return
 
         df_focus = pd.read_json(focus_json_path)
+        df_focus['label'] = 1 # Assign label 1 for focused data
+
         df_nonfocus = pd.read_json(nonfocus_json_path)
+        df_nonfocus['label'] = 0 # Assign label 0 for non-focused data
 
         # 3. 모델 학습 실행 (결과물은 temp_dir에 저장됨)
         print(f"Starting model training in temp dir: {temp_dir}")
