@@ -2,7 +2,7 @@ name: Focus-habit BE continuous-deployment
 
 on:
   push:
-    branches: ["feature/landmarks-only-mode"]
+    branches: ["main"]
 
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
         run: |
           ssh -T -i ~/.ssh/id_rsa ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
             cd Focus_habit_BE
-            git pull origin feature/landmarks-only-mode
+            git pull origin main
             docker-compose down --remove-orphans
             docker-compose up -d --build
             docker image prune -f
