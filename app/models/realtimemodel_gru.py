@@ -61,6 +61,8 @@ def ensure_cols(df, cols):
 
 
 def feature_engineer(df, base=('ear', 'pitch', 'yaw', 'roll'), username="USER"):
+    if df.empty:
+        return df, []
     df = ensure_cols(df, list(base) + ['eye_status', 'prefix'])
     if 'timestamp_ms' not in df.columns: df['timestamp_ms'] = np.arange(len(df))
     if 'prefix' not in df.columns: df['prefix'] = username
@@ -187,6 +189,16 @@ class PersonalizedModelRunner:
             "prefix": [self.user_id]
         })
         tmp, self.features = feature_engineer(tmp, username=self.user_id)
+
+        # Fallback: If feature engineering on the dummy frame fails, define features manually
+        if not self.features:
+            print("Warning: Dynamic feature list generation failed. Using hardcoded feature list.")
+            base_features = ('ear', 'pitch', 'yaw', 'roll')
+            self.features = list(base_features) + \
+                            [f'{f}_diff' for f in base_features] + \
+                            [f'{f}_mean_5' for f in base_features] + \
+                            [f'{f}_std_5' for f in base_features] + \
+                            ['blink_count', 'angle_magnitude']
 
         # 로컬 기본 스케일러 로드
         scaler_path = os.path.join(LOCAL_CKPT_DIR, "scaler.pkl")
