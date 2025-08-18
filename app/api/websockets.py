@@ -11,7 +11,7 @@ from dependencies.factories import get_analysis_service
 router = APIRouter()
 
 @router.websocket("/ws/analysis")
-async def websocket_endpoint(websocket: WebSocket, analysis_service: AnalysisService = Depends(get_analysis_service)):
+async def websocket_endpoint(websocket: WebSocket, user_id: str, analysis_service: AnalysisService = Depends(get_analysis_service)):
     await websocket.accept()
     print("WebSocket connection established.")
 
@@ -56,6 +56,6 @@ async def websocket_endpoint(websocket: WebSocket, analysis_service: AnalysisSer
         print(f"General WebSocket error: {e}")
         await websocket.close(code=1011) # Explicitly close with 1011
     finally:
-        analysis_service.clear_buffer() # Clear buffer on WebSocket disconnect
+        
         analysis_service.close() # Close MediaPipe resources for this connection
         # Removed final analysis print as it's not session-specific anymore
