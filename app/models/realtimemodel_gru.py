@@ -61,6 +61,8 @@ def ensure_cols(df, cols):
 
 
 def feature_engineer(df, base=('ear', 'pitch', 'yaw', 'roll'), username="USER"):
+    if df.empty:
+        return df, []
     df = ensure_cols(df, list(base) + ['eye_status', 'prefix'])
     if 'timestamp_ms' not in df.columns: df['timestamp_ms'] = np.arange(len(df))
     if 'prefix' not in df.columns: df['prefix'] = username
@@ -176,17 +178,15 @@ class PersonalizedModelRunner:
             self.scaler = None
 
     def _load_baseline_model(self):
-        # 헤더는 없으므로, 피처 엔지니어링을 통해 피처 목록을 동적으로 생성
-        tmp = pd.DataFrame({
-            "timestamp_ms": [0],
-            "eye_status": ["OPEN"],
-            "ear": [0.0],
-            "pitch": [0.0],
-            "yaw": [0.0],
-            "roll": [0.0],
-            "prefix": [self.user_id]
-        })
-        tmp, self.features = feature_engineer(tmp, username=self.user_id)
+        # Baseline 모델은 고정된 피처 목록을 사용합니다.
+        # 동적 피처 엔지니어링 대신, 피처 목록을 직접 정의하여 안정성을 높입니다.
+        print("Info: Defining baseline model features statically.")
+        base_features = ('ear', 'pitch', 'yaw', 'roll')
+        self.features = list(base_features) + \
+                        [f'{f}_diff' for f in base_features] + \
+                        [f'{f}_mean_5' for f in base_features] + \
+                        [f'{f}_std_5' for f in base_features] + \
+                        ['blink_count', 'angle_magnitude']
 
         # 로컬 기본 스케일러 로드
         scaler_path = os.path.join(LOCAL_CKPT_DIR, "scaler.pkl")
