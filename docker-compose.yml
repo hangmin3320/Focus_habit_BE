@@ -1,5 +1,9 @@
 version: '3.8'
 
+networks:
+  focushabit-network:
+    driver: bridge
+
 services:
   app:
     build: ./app
@@ -7,6 +11,8 @@ services:
     restart: always
     ports:
       - "8000:8000"
+    networks:
+      - focushabit-network
 
   nginx:
     image: nginx:latest
@@ -20,6 +26,8 @@ services:
       - ./certbot/www:/var/www/certbot
     depends_on:
       - app
+    networks:
+      - focushabit-network
 
   certbot:
     image: certbot/certbot
@@ -27,3 +35,16 @@ services:
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
+    networks:
+      - focushabit-network
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "9999:8080"
+    restart: always
+    networks:
+      - focushabit-network
