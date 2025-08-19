@@ -25,9 +25,9 @@ os.makedirs(CKPT_DIR, exist_ok=True)
 
 USERNAME = "username"
 
-# 베이스 모델/스케일러 (이미 학습돼 있음)
+# 베이스 모델/스케일러
 BASE_MODEL_PATH  = os.path.join(CKPT_DIR, "baseline_model.pth")
-BASE_SCALER_PATH = os.path.join(CKPT_DIR, "baseline_scaler.pkl")
+BASE_SCALER_PATH = os.path.join(CKPT_DIR, "scaler.pkl")
 
 # 단일 입력 JSON (집중=0, 비집중=1) — 프로젝트 data 폴더 기준
 FOCUS_JSON_PATH    = os.path.join(PROJECT_ROOT, "data", "focus.json")       # label=0
@@ -38,7 +38,7 @@ WINDOW_SIZE = 25
 OVERLAP     = 0.5
 
 # 학습 에폭/얼리스탑
-EPOCHS              = 15
+EPOCHS              = 20
 EARLY_STOP_PATIENCE = 7
 LR                  = 1e-4
 WEIGHT_DECAY        = 1e-5
@@ -616,15 +616,13 @@ def compare_and_activate_df(df_test, metric="f1"):
         metrics, details = out
         if metrics: results.append({"profile":name, **metrics})
         if details is not None and len(details)>0:
-            # CSV 저장 제거: details.to_csv(...)
             details_list.append(details)
 
     if not results: return None
 
-    # 합본 CSV 저장 제거
+
     if len(details_list)>0:
         all_details = pd.concat(details_list, ignore_index=True)
-        # (no CSV write)
 
     df = pd.DataFrame(results)
     best_row = df.iloc[df[metric].values.argmax()]
@@ -702,6 +700,5 @@ if __name__ == "__main__":
                       epochs=EPOCHS, patience=EARLY_STOP_PATIENCE, lr=LR, wd=WEIGHT_DECAY,
                       min_train_pr_auc=None)
 
-    # 4) 테스트셋 평가 & 최종 활성화 (CSV 저장 없음)
     summary = compare_and_activate_df(df_test, metric="f1")
     print(summary)
