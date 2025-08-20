@@ -662,6 +662,23 @@ def compare_and_activate_df(df_test, metric="f1"):
               open(os.path.join(CKPT_DIR,"active_profile.json"),"w"))
     return {"best":best, "table":df.to_dict(orient="records")}
 
+
+def stratified_time_split(df, test_ratio=0.4):
+    """
+    집중(label=0), 비집중(label=1) 각각 시간순으로 split 한 뒤,
+    train/test 를 합쳐서 반환.
+    """
+    dfs_train, dfs_test = [], []
+    for lbl in sorted(df["label"].unique()):
+        sub = df[df["label"]==lbl].sort_values("timestamp_ms").reset_index(drop=True)
+        k = max(1, int(len(sub) * (1 - test_ratio)))
+        dfs_train.append(sub.iloc[:k].copy())
+        dfs_test.append(sub.iloc[k:].copy())
+    df_train = pd.concat(dfs_train, ignore_index=True).sort_values("timestamp_ms").reset_index(drop=True)
+    df_test  = pd.concat(dfs_test,  ignore_index=True).sort_values("timestamp_ms").reset_index(drop=True)
+    return df_train, df_test
+
+
 # -------------------
 # main
 # -------------------
@@ -673,7 +690,8 @@ if __name__ == "__main__":
     df_all, feats = load_from_two_jsons(USERNAME, FOCUS_JSON_PATH, NONFOCUS_JSON_PATH)
 
     # 2) 0.6/0.4 split (timestamp 순서)
-    df_train, df_test = split_train_test(df_all, test_ratio=0.4)
+    df_train, df_test = stratified_time_split(df_all, test_ratio=0.4)
+
 
     # 3) 프로파일 생성/학습
     _ = run_cal(USERNAME, df_train, feats, BASE_MODEL_PATH, BASE_SCALER_PATH, WINDOW_SIZE, OVERLAP)
