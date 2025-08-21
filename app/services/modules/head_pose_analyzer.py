@@ -3,7 +3,6 @@ from typing import Dict, Any, List
 import numpy as np
 import cv2
 
-
 class HeadPoseAnalyzer:
     """
     MediaPipe 얼굴 랜드마크와 OpenCV를 사용하여 머리의 3차원 방향(Pitch, Yaw, Roll)을 추정합니다.
@@ -22,7 +21,9 @@ class HeadPoseAnalyzer:
         self.prev_yaw = 0.0
         self.prev_roll = 0.0
 
-    def analyze_frame(self, face_landmarks: List[Any], image_shape: tuple) -> Dict[str, Any]:
+    def analyze_frame(
+        self, face_landmarks: List[Any], image_shape: tuple
+    ) -> Dict[str, Any]:
         """
         단일 프레임의 얼굴 랜드마크를 분석하여 머리 자세를 추정합니다.
         OpenCV의 solvePnP를 사용하여 2D 이미지 좌표로부터 3D 회전 각도를 계산합니다.
@@ -41,27 +42,35 @@ class HeadPoseAnalyzer:
         img_h, img_w = image_shape
 
         # 3D 모델 포인트 (일반적인 얼굴 모델 기준)
-        face_3d_model_points = np.array([
-            [0.0, 0.0, 0.0],  # Nose tip
-            [0.0, -330.0, -65.0],  # Chin
-            [-225.0, 170.0, -135.0],  # Left eye left corner
-            [225.0, 170.0, -135.0],  # Right eye right corner
-            [-150.0, -150.0, -125.0],  # Left Mouth corner
-            [150.0, -150.0, -125.0]  # Right mouth corner
-        ], dtype=np.float64)
+        face_3d_model_points = np.array(
+            [
+                [0.0, 0.0, 0.0],  # Nose tip
+                [0.0, -330.0, -65.0],  # Chin
+                [-225.0, 170.0, -135.0],  # Left eye left corner
+                [225.0, 170.0, -135.0],  # Right eye right corner
+                [-150.0, -150.0, -125.0],  # Left Mouth corner
+                [150.0, -150.0, -125.0],  # Right mouth corner
+            ],
+            dtype=np.float64,
+        )
 
         # 해당 3D 포인트에 대응하는 2D 랜드마크 인덱스
-        face_2d_image_points_indices = [1, 199, 263, 33, 61, 291]
+        face_2d_image_points_indices = [1, 199, 33, 263, 61, 291]
 
-        face_2d_image_points = np.array([
-            (face_landmarks[i].x * img_w, face_landmarks[i].y * img_h) for i in face_2d_image_points_indices
-        ], dtype=np.float64)
+        face_2d_image_points = np.array(
+            [
+                (face_landmarks[i].x * img_w, face_landmarks[i].y * img_h)
+                for i in face_2d_image_points_indices
+            ],
+            dtype=np.float64,
+        )
 
         # 카메라 매개변수 (가정)
         focal_length = img_w
-        cam_matrix = np.array([[focal_length, 0, img_w / 2],
-                               [0, focal_length, img_h / 2],
-                               [0, 0, 1]], dtype=np.float64)
+        cam_matrix = np.array(
+            [[focal_length, 0, img_w / 2], [0, focal_length, img_h / 2], [0, 0, 1]],
+            dtype=np.float64,
+        )
 
         # 왜곡 계수 (없다고 가정)
         dist_matrix = np.zeros((4, 1), dtype=np.float64)
@@ -72,7 +81,7 @@ class HeadPoseAnalyzer:
             face_2d_image_points,
             cam_matrix,
             dist_matrix,
-            flags=cv2.SOLVEPNP_ITERATIVE
+            flags=cv2.SOLVEPNP_ITERATIVE,
         )
 
         if not success:
@@ -82,7 +91,10 @@ class HeadPoseAnalyzer:
         rotation_matrix, _ = cv2.Rodrigues(rotation_vector)
 
         # 회전 행렬로부터 오일러 각도(Pitch, Yaw, Roll) 계산
-        sy = math.sqrt(rotation_matrix[0, 0] * rotation_matrix[0, 0] + rotation_matrix[1, 0] * rotation_matrix[1, 0])
+        sy = math.sqrt(
+            rotation_matrix[0, 0] * rotation_matrix[0, 0]
+            + rotation_matrix[1, 0] * rotation_matrix[1, 0]
+        )
         singular = sy < 1e-6
 
         if not singular:
@@ -99,15 +111,44 @@ class HeadPoseAnalyzer:
         yaw = math.degrees(yaw)
         roll = math.degrees(roll)
 
+        # 눈 바깥 코너 좌표
+        p33 = np.array(
+            [face_landmarks[33].x * img_w, face_landmarks[33].y * img_h]
+        )  # subject-right
+        p263 = np.array(
+            [face_landmarks[263].x * img_w, face_landmarks[263].y * img_h]
+        )  # subject-left
+
+        # 화면에서 더 왼쪽(x 작은)이 left, 더 오른쪽이 right가 되도록 보정
+        if p33[0] < p263[0]:
+            left, right = p33, p263
+        else:
+            left, right = p263, p33
+
+        dx = right[0] - left[0]  # 보장: dx > 0
+        dy = right[1] - left[1]
+        # print(dx)
+        # print(dy)
+        roll = math.degrees(
+            math.atan2(dy, dx)
+        )  # 수평이면 0°, 오른쪽이 아래면 +, 위면 -
+
+        # -90 ~ 90 범위
+        if pitch > 90:
+            pitch -= 180
+        elif pitch < -90:
+            pitch += 180
+
+
         # 평활화 (Smoothing)
-        pitch = self.prev_pitch * self.smoothing_factor + pitch * (1 - self.smoothing_factor)
+        pitch = self.prev_pitch * self.smoothing_factor + pitch * (
+            1 - self.smoothing_factor
+        )
         yaw = self.prev_yaw * self.smoothing_factor + yaw * (1 - self.smoothing_factor)
-        roll = self.prev_roll * self.smoothing_factor + roll * (1 - self.smoothing_factor)
+        roll = self.prev_roll * self.smoothing_factor + roll * (
+            1 - self.smoothing_factor
+        )
 
         self.prev_pitch, self.prev_yaw, self.prev_roll = pitch, yaw, roll
 
-        return {
-            "pitch": round(pitch, 2),
-            "yaw": round(yaw, 2),
-            "roll": round(roll, 2)
-        }
+        return {"pitch": round(pitch, 2), "yaw": round(yaw, 2), "roll": round(roll, 2)}
