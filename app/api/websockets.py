@@ -4,6 +4,8 @@ import numpy as np
 import time
 import json
 
+from typing import Optional
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request, Depends
 from services.analysis_service import AnalysisService
 from dependencies.factories import get_analysis_service
@@ -11,9 +13,11 @@ from dependencies.factories import get_analysis_service
 router = APIRouter()
 
 @router.websocket("/ws/analysis")
-async def websocket_endpoint(websocket: WebSocket, analysis_service: AnalysisService = Depends(get_analysis_service)):
+async def websocket_endpoint(websocket: WebSocket, user_id: Optional[str] = None, analysis_service: AnalysisService = Depends(get_analysis_service)):
     await websocket.accept()
-    print("WebSocket connection established.")
+    print(f"WebSocket connection established for user: {user_id if user_id else 'anonymous'}")
+    last_send_time = 0
+    throttle_interval = 1.0  # 1 second
 
     try:
         while True:
@@ -39,23 +43,27 @@ async def websocket_endpoint(websocket: WebSocket, analysis_service: AnalysisSer
 
             # --- 3. 분석 파이프라인 실행 및 결과 전송 ---
             try:
-                # Call the analyze_frame method of the AnalysisService
                 analysis_results = await analysis_service.analyze_frame(img_bgr)
-                
-                # Send the results back to the client
-                await websocket.send_json(analysis_results)
+
+                # user_id가 있는 경우에만 전송 제한 적용
+                if user_id:
+                    current_time = time.time()
+                    if current_time - last_send_time >= throttle_interval:
+                        await websocket.send_json(analysis_results)
+                        last_send_time = current_time
+                else:
+                    # user_id가 없으면 제한 없이 바로 전송
+                    await websocket.send_json(analysis_results)
+
             except Exception as e:
                 print(f"Error during analysis or sending results: {e}")
-                # Consider sending an error message to the client before closing
-                await websocket.close(code=1011) # Explicitly close with 1011
-                break # Break the loop after closing connection
+                await websocket.close(code=1011)
+                break
 
     except WebSocketDisconnect:
-        print("WebSocket connection disconnected.")
+        print(f"WebSocket connection disconnected for user: {user_id if user_id else 'anonymous'}")
     except Exception as e:
-        print(f"General WebSocket error: {e}")
-        await websocket.close(code=1011) # Explicitly close with 1011
+        print(f"General WebSocket error for user {user_id if user_id else 'anonymous'}: {e}")
+        await websocket.close(code=1011)
     finally:
-        
-        analysis_service.close() # Close MediaPipe resources for this connection
-        # Removed final analysis print as it's not session-specific anymore
+        analysis_service.close()
