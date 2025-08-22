@@ -26,7 +26,7 @@ class SupabaseService:
         try:
             response = self.client.storage.from_(bucket_name).create_signed_upload_url(
                 path=file_path,
-                file_options={"upsert": True} # 파일이 존재할 경우 덮어쓰도록 설정
+                file_options={"upsert": "ture"} # 파일이 존재할 경우 덮어쓰도록 설정
             )
             print(f"Supabase create_signed_upload_url response: {response}")
             return response.get('signed_url')
