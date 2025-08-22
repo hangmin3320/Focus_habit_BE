@@ -126,7 +126,7 @@ class AnalysisService:
                         # 졸음 상태로 판단
                         prediction_result = {
                             "timestamp": current_timestamp,
-                            "prediction": "졸음", # 또는 정의된 상수
+                            "prediction": "drowsiness", # 또는 정의된 상수
                             "confidence": 1.0 # 룰 기반이므로 1.0
                         }
                         # 다른 필드 (eye_status, head_pose)는 이전 프레임 데이터에서 가져오거나 기본값 설정
