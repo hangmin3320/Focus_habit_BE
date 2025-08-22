@@ -22,11 +22,22 @@ class SupabaseService:
     def generate_presigned_upload_url(self, bucket_name: str, file_path: str, expires_in: int = 3600) -> str | None:
         """
         지정된 경로에 파일을 업로드할 수 있는 Presigned URL을 생성합니다.
+        파일이 이미 존재할 경우, 삭제한 후 URL을 생성하여 덮어쓰기를 지원합니다.
         """
         try:
+            # 1. Check if file exists by listing files in its directory.
+            dir_path = os.path.dirname(file_path)
+            file_name = os.path.basename(file_path)
+            existing_files = self.client.storage.from_(bucket_name).list(path=dir_path)
+
+            # 2. If the file exists in the list, remove it.
+            if any(f['name'] == file_name for f in existing_files):
+                print(f"File {file_path} already exists. Removing it before generating new URL.")
+                self.client.storage.from_(bucket_name).remove(paths=[file_path])
+
+            # 3. Now that the path is clear, create the signed URL for a new upload.
             response = self.client.storage.from_(bucket_name).create_signed_upload_url(
-                path=file_path,
-                file_options={"upsert": "ture"} # 파일이 존재할 경우 덮어쓰도록 설정
+                path=file_path
             )
             print(f"Supabase create_signed_upload_url response: {response}")
             return response.get('signed_url')
