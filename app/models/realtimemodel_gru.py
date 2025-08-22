@@ -272,6 +272,7 @@ class PersonalizedModelRunner:
                         yaw = float(g['yaw'].iloc[i + self.window_size - 1])
                         roll = float(g['roll'].iloc[i + self.window_size - 1])
                         conf = float(max(pr, 1.0 - pr))
+                        state = "focus" if pred == 0 else "non_focus"
                         rec = {
                             "timestamp": ts,
                             "eye_status": {"status": eye, "ear_value": ear},
@@ -279,7 +280,8 @@ class PersonalizedModelRunner:
                             "prediction_result": {
                                 "timestamp": ts,
                                 "prediction": float(np.clip(pr * 100.0, 0.0, 100.0)),
-                                "confidence": conf
+                                "confidence": conf,
+                                "state": state 
                             }
                         }
                         records.append(rec)
