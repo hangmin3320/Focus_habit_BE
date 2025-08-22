@@ -53,7 +53,6 @@ class TimeSeriesCNNGRU(nn.Module):
         return self.fc(h)
 
 
-# feature_engineer, compute_stride, majority_smooth 함수 등은 변경 없음...
 def ensure_cols(df, cols):
     for c in cols:
         if c not in df.columns: df[c] = 0.0
@@ -77,7 +76,7 @@ def feature_engineer(df, base=('ear', 'pitch', 'yaw', 'roll'), username="USER"):
         df[f'{f}_std_5'] = s
     df['eye_status_numeric'] = df['eye_status'].apply(lambda x: x.get('status') if isinstance(x, dict) else x).map({'OPEN': 1, 'CLOSED': 0}).fillna(0)
     t = df.groupby('prefix')['eye_status_numeric'].diff().eq(-1)
-    df['blink_count'] = t.rolling(window=5, min_periods=1).sum().fillna(0).reset_index(level=0, drop=True)
+    df['blink_count'] = t.rolling(window=50, min_periods=1).sum().fillna(0).reset_index(level=0, drop=True)
     df['angle_magnitude'] = np.sqrt(df['pitch_diff'] ** 2 + df['yaw_diff'] ** 2 + df['roll_diff'] ** 2)
     feats = list(base) + [f'{f}_diff' for f in base] + [f'{f}_mean_5' for f in base] + [f'{f}_std_5' for f in base] + [
         'blink_count', 'angle_magnitude']

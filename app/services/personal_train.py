@@ -143,9 +143,6 @@ def train_personal(username, df_focus, df_nonfocus, output_dir, base_model_path=
 
     stride = compute_stride(window_size, overlap)
     X, y = create_sequences(df, feats, window_size, stride, threshold=0.5)
-    if X.shape[0] < 20: # 데이터가 너무 적으면 학습 중단
-        print(f"User '{username}' - Insufficient data to train. Aborting.")
-        return None
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = TimeSeriesCNNGRU(len(feats), window_size).to(device)
