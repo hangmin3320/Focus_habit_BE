@@ -33,11 +33,11 @@ def feature_engineer(df, base=('ear','pitch','yaw','roll'), username="USER"):
     t = df.groupby('prefix')['eye_status_numeric'].diff().eq(-1)
     df['blink_count']        = t.rolling(window=5,min_periods=1).sum().fillna(0).reset_index(level=0,drop=True)
     df['angle_magnitude']    = np.sqrt(df['pitch_diff']**2+df['yaw_diff']**2+df['roll_diff']**2)
-    feats = list(base) 
-          + [f'{f}_diff' for f in base] 
-          + [f'{f}_mean_5' for f in base] 
-          + [f'{f}_std_5'  for f in base] 
-          + ['blink_count','angle_magnitude']
+    feats = (list(base)
+             + [f'{f}_diff' for f in base]
+             + [f'{f}_mean_5' for f in base]
+             + [f'{f}_std_5'  for f in base]
+             + ['blink_count','angle_magnitude'])
     df[feats] = df[feats].replace([np.inf,-np.inf],0).fillna(0)
     return df, feats
 
@@ -111,13 +111,13 @@ def stratified_time_split(df, test_ratio: float = 0.4):
         label_df = df[df['label'] == label].copy()
         if len(label_df) == 0: # 해당 라벨의 데이터가 없으면 건너뛰기
             continue
-        
+
         # 시간 순서대로 정렬
         label_df = label_df.sort_values("timestamp_ms").reset_index(drop=True)
-        
+
         # 분할 지점 계산
         split_idx = max(1, int(len(label_df) * (1 - test_ratio)))
-        
+
         train_dfs.append(label_df.iloc[:split_idx].copy())
         test_dfs.append(label_df.iloc[split_idx:].copy())
 
